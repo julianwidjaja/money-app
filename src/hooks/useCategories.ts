@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '@/lib/constants'
@@ -17,61 +17,59 @@ export function useCategories() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const seeded = useRef(false)
 
   const fetchCategories = useCallback(async () => {
     if (!user) return
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_archived', false)
       .order('sort_order')
-    if (!error && data) {
-      if (data.length === 0) {
-        await seedDefaultCategories()
-        return
+
+    if (error) { setLoading(false); return }
+
+    if (data.length === 0 && !seeded.current) {
+      seeded.current = true
+      const { count } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      if (!count || count === 0) {
+        const expenseRows = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({
+          user_id: user.id,
+          name: c.name,
+          type: 'expense' as const,
+          icon: c.icon,
+          color: c.color,
+          sort_order: i,
+        }))
+        const incomeRows = DEFAULT_INCOME_CATEGORIES.map((c, i) => ({
+          user_id: user.id,
+          name: c.name,
+          type: 'income' as const,
+          icon: c.icon,
+          color: c.color,
+          sort_order: i,
+        }))
+        const { data: seededData } = await supabase
+          .from('categories')
+          .insert([...expenseRows, ...incomeRows])
+          .select()
+        if (seededData) {
+          setCategories(seededData as Category[])
+          setLoading(false)
+          return
+        }
       }
-      const deduped = deduplicateByName(data as Category[])
-      setCategories(deduped)
     }
+
+    setCategories(deduplicateByName(data as Category[]))
     setLoading(false)
   }, [user])
-
-  async function seedDefaultCategories() {
-    if (!user) return
-    const { count } = await supabase
-      .from('categories')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-    if (count && count > 0) {
-      await fetchCategories()
-      return
-    }
-    const expenseRows = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({
-      user_id: user.id,
-      name: c.name,
-      type: 'expense' as const,
-      icon: c.icon,
-      color: c.color,
-      sort_order: i,
-    }))
-    const incomeRows = DEFAULT_INCOME_CATEGORIES.map((c, i) => ({
-      user_id: user.id,
-      name: c.name,
-      type: 'income' as const,
-      icon: c.icon,
-      color: c.color,
-      sort_order: i,
-    }))
-    const { data, error } = await supabase
-      .from('categories')
-      .insert([...expenseRows, ...incomeRows])
-      .select()
-    if (!error && data) {
-      setCategories(data as Category[])
-    }
-    setLoading(false)
-  }
 
   useEffect(() => { fetchCategories() }, [fetchCategories])
 
