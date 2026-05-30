@@ -5,12 +5,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import { TransferForm } from '@/components/transactions/TransferForm'
-import { SplitTransactionForm } from '@/components/transactions/SplitTransactionForm'
 import { ArrowLeft } from 'lucide-react'
 import type { TransactionWithEntries } from '@/types'
 import type { SimpleEditData } from '@/components/transactions/TransactionForm'
 import type { TransferEditData } from '@/components/transactions/TransferForm'
-import type { SplitEditData } from '@/components/transactions/SplitTransactionForm'
 
 export function EditTransactionPage() {
   const { id } = useParams()
@@ -112,13 +110,14 @@ export function EditTransactionPage() {
     const reimbursementEntries = tx.entries.filter(e => e.type === 'reimbursement')
     if (!expenseEntry) return <div className="py-12 text-center text-muted-foreground">Invalid split transaction</div>
 
-    const editData: SplitEditData = {
+    const editData: SimpleEditData = {
       groupId: tx.id,
-      totalAmount: expenseEntry.amount,
+      amount: expenseEntry.amount,
       accountId: expenseEntry.account_id,
       categoryId: expenseEntry.category_id || '',
       date: tx.date,
-      description: tx.description || '',
+      note: tx.description || '',
+      isSplit: true,
       reimbursements: reimbursementEntries.map(r => ({
         id: r.id,
         friendName: (r.note || '').replace('Reimbursement from ', ''),
@@ -132,7 +131,7 @@ export function EditTransactionPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
-        <SplitTransactionForm onSuccess={handleSuccess} editData={editData} />
+        <TransactionForm type="expense" onSuccess={handleSuccess} editData={editData} />
       </div>
     )
   }
