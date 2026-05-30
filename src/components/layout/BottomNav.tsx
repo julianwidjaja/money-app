@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router'
-import { Home, ListOrdered, Plus, BarChart3, Menu } from 'lucide-react'
+import { Home, ListOrdered, Plus, BarChart3, Menu, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/', icon: Home, label: 'Home' },
   { to: '/transactions', icon: ListOrdered, label: 'Transactions' },
+  { to: '/accounts', icon: Wallet, label: 'Accounts' },
   { to: '/transactions/add', icon: Plus, label: 'Add', isCenter: true },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Menu, label: 'More' },

@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LogOut, Moon, Sun, User } from 'lucide-react'
+import { LogOut, Moon, Sun, User, CircleDollarSign } from 'lucide-react'
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -43,9 +43,12 @@ export function TopBar() {
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="flex items-center justify-between h-14 px-4 max-w-2xl mx-auto">
-        <Link to="/" className="text-lg font-semibold text-foreground no-underline">
-          {title}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-1.5 text-primary hover:opacity-80 transition-opacity no-underline">
+            <CircleDollarSign className="w-6 h-6" />
+          </Link>
+          <span className="text-lg font-semibold text-foreground">{title}</span>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
