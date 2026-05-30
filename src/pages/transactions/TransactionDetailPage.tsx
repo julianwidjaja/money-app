@@ -10,7 +10,8 @@ import { Separator } from '@/components/ui/separator'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { getCategoryIcon } from '@/lib/icons'
-import { Trash2, ArrowLeft } from 'lucide-react'
+import { Trash2, ArrowLeft, Pencil } from 'lucide-react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import type { TransactionWithEntries } from '@/types'
 
@@ -165,9 +166,16 @@ export function TransactionDetailPage() {
 
           <Separator />
 
-          <Button variant="destructive" size="sm" className="w-full" onClick={handleDelete}>
-            <Trash2 className="w-4 h-4 mr-2" /> Delete Transaction
-          </Button>
+          <div className="flex gap-2">
+            <Link to={`/transactions/${id}/edit`} className="flex-1">
+              <Button variant="outline" size="sm" className="w-full">
+                <Pencil className="w-4 h-4 mr-2" /> Edit
+              </Button>
+            </Link>
+            <Button variant="destructive" size="sm" className="flex-1" onClick={handleDelete}>
+              <Trash2 className="w-4 h-4 mr-2" /> Delete
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

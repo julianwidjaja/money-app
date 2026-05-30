@@ -10,19 +10,30 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ArrowDown } from 'lucide-react'
 
-interface TransferFormProps {
-  onSuccess: () => void
+export interface TransferEditData {
+  groupId: string
+  amount: number
+  fromAccountId: string
+  toAccountId: string
+  date: string
+  note: string
 }
 
-export function TransferForm({ onSuccess }: TransferFormProps) {
-  const { accounts } = useAccounts()
-  const { createTransfer } = useTransactions()
+interface TransferFormProps {
+  onSuccess: () => void
+  editData?: TransferEditData
+}
 
-  const [amount, setAmount] = useState(0)
-  const [fromAccountId, setFromAccountId] = useState('')
-  const [toAccountId, setToAccountId] = useState('')
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [note, setNote] = useState('')
+export function TransferForm({ onSuccess, editData }: TransferFormProps) {
+  const { accounts } = useAccounts()
+  const { createTransfer, updateTransfer } = useTransactions()
+  const isEdit = !!editData
+
+  const [amount, setAmount] = useState(editData?.amount ?? 0)
+  const [fromAccountId, setFromAccountId] = useState(editData?.fromAccountId ?? '')
+  const [toAccountId, setToAccountId] = useState(editData?.toAccountId ?? '')
+  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [note, setNote] = useState(editData?.note ?? '')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,13 +44,17 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
     if (fromAccountId === toAccountId) { toast.error('Accounts must be different'); return }
 
     setLoading(true)
-    const result = await createTransfer({ amount, fromAccountId, toAccountId, date, note: note || undefined })
+    const input = { amount, fromAccountId, toAccountId, date, note: note || undefined }
+
+    const result = isEdit
+      ? await updateTransfer(editData.groupId, input)
+      : await createTransfer(input)
     setLoading(false)
 
     if (result?.error) {
       toast.error('Failed to save transfer')
     } else {
-      toast.success('Transfer added')
+      toast.success(isEdit ? 'Transfer updated' : 'Transfer added')
       onSuccess()
     }
   }
@@ -90,7 +105,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'Saving...' : 'Add Transfer'}
+        {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Transfer'}
       </Button>
     </form>
   )

@@ -11,23 +11,34 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { getCategoryIcon } from '@/lib/icons'
 
+export interface SimpleEditData {
+  groupId: string
+  amount: number
+  accountId: string
+  categoryId: string
+  date: string
+  note: string
+}
+
 interface TransactionFormProps {
   type: 'income' | 'expense'
   onSuccess: () => void
+  editData?: SimpleEditData
 }
 
-export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
+export function TransactionForm({ type, onSuccess, editData }: TransactionFormProps) {
   const { accounts } = useAccounts()
   const { expenseCategories, incomeCategories } = useCategories()
-  const { createSimpleTransaction } = useTransactions()
+  const { createSimpleTransaction, updateSimpleTransaction } = useTransactions()
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories
+  const isEdit = !!editData
 
-  const [amount, setAmount] = useState(0)
-  const [accountId, setAccountId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [note, setNote] = useState('')
+  const [amount, setAmount] = useState(editData?.amount ?? 0)
+  const [accountId, setAccountId] = useState(editData?.accountId ?? '')
+  const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
+  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [note, setNote] = useState(editData?.note ?? '')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,20 +48,17 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
     if (!categoryId) { toast.error('Select a category'); return }
 
     setLoading(true)
-    const result = await createSimpleTransaction({
-      type,
-      amount,
-      accountId,
-      categoryId,
-      date,
-      note: note || undefined,
-    })
+    const input = { type, amount, accountId, categoryId, date, note: note || undefined }
+
+    const result = isEdit
+      ? await updateSimpleTransaction(editData.groupId, input)
+      : await createSimpleTransaction(input)
     setLoading(false)
 
     if (result?.error) {
       toast.error('Failed to save transaction')
     } else {
-      toast.success(`${type === 'expense' ? 'Expense' : 'Income'} added`)
+      toast.success(isEdit ? 'Transaction updated' : `${type === 'expense' ? 'Expense' : 'Income'} added`)
       onSuccess()
     }
   }
@@ -105,7 +113,7 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'Saving...' : `Add ${type === 'expense' ? 'Expense' : 'Income'}`}
+        {loading ? 'Saving...' : isEdit ? 'Save Changes' : `Add ${type === 'expense' ? 'Expense' : 'Income'}`}
       </Button>
     </form>
   )

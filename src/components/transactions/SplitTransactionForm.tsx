@@ -22,23 +22,35 @@ interface Reimbursement {
   accountId: string
 }
 
-interface SplitTransactionFormProps {
-  onSuccess: () => void
+export interface SplitEditData {
+  groupId: string
+  totalAmount: number
+  accountId: string
+  categoryId: string
+  date: string
+  description: string
+  reimbursements: Reimbursement[]
 }
 
-export function SplitTransactionForm({ onSuccess }: SplitTransactionFormProps) {
+interface SplitTransactionFormProps {
+  onSuccess: () => void
+  editData?: SplitEditData
+}
+
+export function SplitTransactionForm({ onSuccess, editData }: SplitTransactionFormProps) {
   const { accounts } = useAccounts()
   const { expenseCategories } = useCategories()
-  const { createSplitTransaction } = useTransactions()
+  const { createSplitTransaction, updateSplitTransaction } = useTransactions()
+  const isEdit = !!editData
 
-  const [totalAmount, setTotalAmount] = useState(0)
-  const [accountId, setAccountId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [description, setDescription] = useState('')
-  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([
-    { id: crypto.randomUUID(), friendName: '', amount: 0, accountId: '' },
-  ])
+  const [totalAmount, setTotalAmount] = useState(editData?.totalAmount ?? 0)
+  const [accountId, setAccountId] = useState(editData?.accountId ?? '')
+  const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
+  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [description, setDescription] = useState(editData?.description ?? '')
+  const [reimbursements, setReimbursements] = useState<Reimbursement[]>(
+    editData?.reimbursements ?? [{ id: crypto.randomUUID(), friendName: '', amount: 0, accountId: '' }]
+  )
   const [loading, setLoading] = useState(false)
 
   const totalReimbursed = reimbursements.reduce((s, r) => s + r.amount, 0)
@@ -77,7 +89,7 @@ export function SplitTransactionForm({ onSuccess }: SplitTransactionFormProps) {
     }
 
     setLoading(true)
-    const result = await createSplitTransaction({
+    const input = {
       totalAmount,
       accountId,
       categoryId,
@@ -88,13 +100,17 @@ export function SplitTransactionForm({ onSuccess }: SplitTransactionFormProps) {
         amount: r.amount,
         accountId: r.accountId,
       })),
-    })
+    }
+
+    const result = isEdit
+      ? await updateSplitTransaction(editData.groupId, input)
+      : await createSplitTransaction(input)
     setLoading(false)
 
     if (result?.error) {
       toast.error('Failed to save split transaction')
     } else {
-      toast.success('Split transaction added')
+      toast.success(isEdit ? 'Split transaction updated' : 'Split transaction added')
       onSuccess()
     }
   }
@@ -232,7 +248,7 @@ export function SplitTransactionForm({ onSuccess }: SplitTransactionFormProps) {
       </Card>
 
       <Button type="submit" className="w-full" disabled={loading || isOverReimbursed}>
-        {loading ? 'Saving...' : 'Add Split Transaction'}
+        {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Split Transaction'}
       </Button>
     </form>
   )

@@ -212,6 +212,113 @@ export function useTransactions(options?: FetchOptions) {
     return { error }
   }
 
+  async function updateSimpleTransaction(groupId: string, input: CreateSimpleTransactionInput) {
+    if (!user) return
+
+    const { error: groupError } = await supabase
+      .from('transaction_groups')
+      .update({ description: input.note || null, date: input.date, updated_at: new Date().toISOString() })
+      .eq('id', groupId)
+
+    if (groupError) return { error: groupError }
+
+    const { error: entryError } = await supabase
+      .from('transaction_entries')
+      .update({
+        account_id: input.accountId,
+        category_id: input.categoryId,
+        type: input.type as EntryType,
+        amount: input.amount,
+        note: input.note || null,
+      })
+      .eq('group_id', groupId)
+      .eq('user_id', user.id)
+
+    if (!entryError) await fetchTransactions()
+    return { error: entryError }
+  }
+
+  async function updateTransfer(groupId: string, input: CreateTransferInput) {
+    if (!user) return
+
+    const { error: groupError } = await supabase
+      .from('transaction_groups')
+      .update({ description: input.note || null, date: input.date, updated_at: new Date().toISOString() })
+      .eq('id', groupId)
+
+    if (groupError) return { error: groupError }
+
+    const { error: outError } = await supabase
+      .from('transaction_entries')
+      .update({ account_id: input.fromAccountId, amount: input.amount, note: input.note || null })
+      .eq('group_id', groupId)
+      .eq('type', 'transfer_out')
+
+    if (outError) return { error: outError }
+
+    const { error: inError } = await supabase
+      .from('transaction_entries')
+      .update({ account_id: input.toAccountId, amount: input.amount, note: input.note || null })
+      .eq('group_id', groupId)
+      .eq('type', 'transfer_in')
+
+    if (!inError) await fetchTransactions()
+    return { error: inError }
+  }
+
+  async function updateSplitTransaction(groupId: string, input: CreateSplitTransactionInput) {
+    if (!user) return
+
+    const { error: groupError } = await supabase
+      .from('transaction_groups')
+      .update({ description: input.description, date: input.date, updated_at: new Date().toISOString() })
+      .eq('id', groupId)
+
+    if (groupError) return { error: groupError }
+
+    const { error: deleteError } = await supabase
+      .from('transaction_entries')
+      .delete()
+      .eq('group_id', groupId)
+
+    if (deleteError) return { error: deleteError }
+
+    const totalReimbursed = input.reimbursements.reduce((s, r) => s + r.amount, 0)
+    const personalAmount = input.totalAmount - totalReimbursed
+
+    const entries = [
+      {
+        group_id: groupId,
+        user_id: user.id,
+        account_id: input.accountId,
+        category_id: input.categoryId,
+        type: 'expense' as EntryType,
+        amount: input.totalAmount,
+        personal_amount: personalAmount,
+        is_personal_expense: true,
+        note: 'Original payment',
+      },
+      ...input.reimbursements.map(r => ({
+        group_id: groupId,
+        user_id: user.id,
+        account_id: r.accountId,
+        category_id: null as string | null,
+        type: 'reimbursement' as EntryType,
+        amount: r.amount,
+        personal_amount: null as number | null,
+        is_personal_expense: false,
+        note: `Reimbursement from ${r.friendName}`,
+      })),
+    ]
+
+    const { error: insertError } = await supabase
+      .from('transaction_entries')
+      .insert(entries)
+
+    if (!insertError) await fetchTransactions()
+    return { error: insertError }
+  }
+
   async function deleteTransaction(groupId: string) {
     const { error } = await supabase
       .from('transaction_groups')
@@ -229,6 +336,9 @@ export function useTransactions(options?: FetchOptions) {
     createSimpleTransaction,
     createTransfer,
     createSplitTransaction,
+    updateSimpleTransaction,
+    updateTransfer,
+    updateSplitTransaction,
     deleteTransaction,
     refetch: fetchTransactions,
   }

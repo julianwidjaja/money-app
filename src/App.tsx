@@ -9,6 +9,7 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { TransactionsPage } from '@/pages/transactions/TransactionsPage'
 import { AddTransactionPage } from '@/pages/transactions/AddTransactionPage'
 import { TransactionDetailPage } from '@/pages/transactions/TransactionDetailPage'
+import { EditTransactionPage } from '@/pages/transactions/EditTransactionPage'
 import { AccountsPage } from '@/pages/accounts/AccountsPage'
 import { AccountDetailPage } from '@/pages/accounts/AccountDetailPage'
 import { BudgetsPage } from '@/pages/budgets/BudgetsPage'
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="transactions/add" element={<AddTransactionPage />} />
               <Route path="transactions/:id" element={<TransactionDetailPage />} />
+              <Route path="transactions/:id/edit" element={<EditTransactionPage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="budgets" element={<BudgetsPage />} />

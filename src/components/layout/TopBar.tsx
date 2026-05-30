@@ -30,7 +30,9 @@ export function TopBar() {
   const { resolvedTheme, setTheme } = useTheme()
   const location = useLocation()
 
-  const title = pageTitles[location.pathname] || 'Money App'
+  let title = pageTitles[location.pathname] || 'Money App'
+  if (location.pathname.match(/^\/transactions\/[^/]+\/edit$/)) title = 'Edit Transaction'
+  else if (location.pathname.match(/^\/transactions\/[^/]+$/)) title = 'Transaction'
   const initials = user?.user_metadata?.full_name
     ?.split(' ')
     .map((n: string) => n[0])
