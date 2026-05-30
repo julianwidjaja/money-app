@@ -74,7 +74,7 @@ export function DashboardPage() {
                       <p className="font-medium text-sm">{b.name}</p>
                       <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[b.type]}</p>
                     </div>
-                    <CurrencyDisplay cents={b.current_balance} type="neutral" />
+                    <CurrencyDisplay cents={b.current_balance} type={b.type === 'credit_card' ? 'expense' : 'neutral'} showSign={b.type === 'credit_card'} />
                   </CardContent>
                 </Card>
               </Link>

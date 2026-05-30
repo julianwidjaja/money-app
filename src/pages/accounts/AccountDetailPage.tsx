@@ -29,9 +29,16 @@ export function AccountDetailPage() {
         <CardContent className="pt-6 text-center">
           <p className="text-sm text-muted-foreground">{account.name}</p>
           <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</p>
-          <p className="text-3xl font-bold mt-2">
-            {balance ? formatCurrency(balance.current_balance) : '—'}
-          </p>
+          {balance ? (
+            <CurrencyDisplay
+              cents={balance.current_balance}
+              type={account.type === 'credit_card' ? 'expense' : 'neutral'}
+              showSign={account.type === 'credit_card'}
+              className="text-3xl font-bold mt-2"
+            />
+          ) : (
+            <p className="text-3xl font-bold mt-2">—</p>
+          )}
         </CardContent>
       </Card>
 
