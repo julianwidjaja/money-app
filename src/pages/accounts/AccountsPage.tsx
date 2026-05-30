@@ -77,7 +77,7 @@ export function AccountsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Type</Label>
-                <Select value={type} onValueChange={(v) => v != null && setType(v as AccountType)}>
+                <Select value={type} onValueChange={(v) => v != null && setType(v as AccountType)} items={Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => (

@@ -4,6 +4,15 @@ import { useAuth } from '@/contexts/AuthContext'
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '@/lib/constants'
 import type { Category, CategoryType } from '@/types'
 
+function deduplicateByName(categories: Category[]): Category[] {
+  const seen = new Map<string, Category>()
+  for (const c of categories) {
+    const key = `${c.name}:${c.type}`
+    if (!seen.has(key)) seen.set(key, c)
+  }
+  return Array.from(seen.values())
+}
+
 export function useCategories() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
@@ -22,13 +31,22 @@ export function useCategories() {
         await seedDefaultCategories()
         return
       }
-      setCategories(data as Category[])
+      const deduped = deduplicateByName(data as Category[])
+      setCategories(deduped)
     }
     setLoading(false)
   }, [user])
 
   async function seedDefaultCategories() {
     if (!user) return
+    const { count } = await supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+    if (count && count > 0) {
+      await fetchCategories()
+      return
+    }
     const expenseRows = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({
       user_id: user.id,
       name: c.name,

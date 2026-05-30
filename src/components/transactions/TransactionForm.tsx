@@ -63,6 +63,9 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
   const personalAmount = amount - totalReimbursed
   const isOverReimbursed = isSplit && totalReimbursed > amount
 
+  const accountItems = accounts.map(a => ({ value: a.id, label: a.name }))
+  const categoryItems = categories.map(c => ({ value: c.id, label: c.name }))
+
   function addReimbursement() {
     setReimbursements(prev => [
       ...prev,
@@ -141,7 +144,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
 
       <div className="space-y-1.5">
         <Label>Account</Label>
-        <Select value={accountId} onValueChange={(v) => v != null && setAccountId(v)}>
+        <Select value={accountId} onValueChange={(v) => v != null && setAccountId(v)} items={accountItems}>
           <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
             {accounts.map(a => (
@@ -153,7 +156,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
 
       <div className="space-y-1.5">
         <Label>Category</Label>
-        <Select value={categoryId} onValueChange={(v) => v != null && setCategoryId(v)}>
+        <Select value={categoryId} onValueChange={(v) => v != null && setCategoryId(v)} items={categoryItems}>
           <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
           <SelectContent>
             {categories.map(c => {
@@ -234,7 +237,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
                     onChange={(v) => updateReimbursement(r.id, 'amount', v)}
                     placeholder="Amount they owe"
                   />
-                  <Select value={r.accountId} onValueChange={(v) => v != null && updateReimbursement(r.id, 'accountId', v)}>
+                  <Select value={r.accountId} onValueChange={(v) => v != null && updateReimbursement(r.id, 'accountId', v)} items={accountItems}>
                     <SelectTrigger><SelectValue placeholder="Receiving account" /></SelectTrigger>
                     <SelectContent>
                       {accounts.map(a => (

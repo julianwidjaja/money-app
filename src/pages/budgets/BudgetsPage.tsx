@@ -74,7 +74,7 @@ export function BudgetsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Select value={selectedCategory} onValueChange={(v) => v != null && setSelectedCategory(v)}>
+                <Select value={selectedCategory} onValueChange={(v) => v != null && setSelectedCategory(v)} items={unbugdetedCategories.map(c => ({ value: c.id, label: c.name }))}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {unbugdetedCategories.map(c => {

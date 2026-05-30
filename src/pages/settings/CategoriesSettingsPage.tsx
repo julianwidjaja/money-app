@@ -87,7 +87,7 @@ export function CategoriesSettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Type</Label>
-                <Select value={type} onValueChange={(v) => v != null && setType(v as CategoryType)}>
+                <Select value={type} onValueChange={(v) => v != null && setType(v as CategoryType)} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="expense">Expense</SelectItem>

@@ -83,7 +83,7 @@ export function RecurringSettingsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Type</Label>
-                <Select value={txType} onValueChange={(v) => v != null && setTxType(v as 'expense' | 'income')}>
+                <Select value={txType} onValueChange={(v) => v != null && setTxType(v as 'expense' | 'income')} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="expense">Expense</SelectItem>
@@ -97,7 +97,7 @@ export function RecurringSettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Account</Label>
-                <Select value={accountId} onValueChange={(v) => v != null && setAccountId(v)}>
+                <Select value={accountId} onValueChange={(v) => v != null && setAccountId(v)} items={accounts.map(a => ({ value: a.id, label: a.name }))}>
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
                     {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
@@ -106,7 +106,7 @@ export function RecurringSettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Select value={categoryId} onValueChange={(v) => v != null && setCategoryId(v)}>
+                <Select value={categoryId} onValueChange={(v) => v != null && setCategoryId(v)} items={categories.map(c => ({ value: c.id, label: c.name }))}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {categories.map(c => {
@@ -125,7 +125,7 @@ export function RecurringSettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Frequency</Label>
-                <Select value={frequency} onValueChange={(v) => v != null && setFrequency(v as RecurrenceFrequency)}>
+                <Select value={frequency} onValueChange={(v) => v != null && setFrequency(v as RecurrenceFrequency)} items={Object.entries(RECURRENCE_LABELS).map(([value, label]) => ({ value, label }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (

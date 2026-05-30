@@ -36,6 +36,8 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
   const [note, setNote] = useState(editData?.note ?? '')
   const [loading, setLoading] = useState(false)
 
+  const accountItems = accounts.map(a => ({ value: a.id, label: a.name }))
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (amount <= 0) { toast.error('Enter an amount'); return }
@@ -68,7 +70,7 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
 
       <div className="space-y-1.5">
         <Label>From Account</Label>
-        <Select value={fromAccountId} onValueChange={(v) => v != null && setFromAccountId(v)}>
+        <Select value={fromAccountId} onValueChange={(v) => v != null && setFromAccountId(v)} items={accountItems}>
           <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
             {accounts.map(a => (
@@ -84,7 +86,7 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
 
       <div className="space-y-1.5">
         <Label>To Account</Label>
-        <Select value={toAccountId} onValueChange={(v) => v != null && setToAccountId(v)}>
+        <Select value={toAccountId} onValueChange={(v) => v != null && setToAccountId(v)} items={accountItems}>
           <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
             {accounts.map(a => (
