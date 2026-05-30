@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router'
-import { Home, ListOrdered, Plus, BarChart3, Menu, Wallet } from 'lucide-react'
+import { ListOrdered, Plus, BarChart3, Menu, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -15,7 +15,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="flex items-center justify-around max-w-2xl mx-auto h-16">
+      <div className="grid grid-cols-5 items-center h-16 sm:h-18 max-w-2xl mx-auto px-1 sm:px-4">
         {navItems.map((item) => {
           const isActive = item.to === '/'
             ? location.pathname === '/'
@@ -27,9 +27,9 @@ export function BottomNav() {
               <Link
                 key={item.to}
                 to={item.to}
-                className="flex items-center justify-center -mt-5 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition-opacity"
+                className="flex items-center justify-center mx-auto -mt-5 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition-opacity"
               >
-                <Icon className="w-7 h-7" />
+                <Icon className="w-7 h-7 sm:w-8 sm:h-8" />
               </Link>
             )
           }
@@ -39,11 +39,11 @@ export function BottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                'flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors',
+                'flex flex-col items-center justify-center gap-0.5 sm:gap-1 py-2 text-[10px] sm:text-xs transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
               <span>{item.label}</span>
             </Link>
           )

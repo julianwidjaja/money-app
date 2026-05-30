@@ -1,20 +1,20 @@
 export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   cash: 'Cash',
-  bank: 'Bank Account',
+  chequing: 'Chequing Account',
   credit_card: 'Credit Card',
-  savings: 'Savings',
+  savings: 'Savings Account',
   investment: 'Investment',
   other: 'Other',
-}
+};
 
 export const ACCOUNT_TYPE_ICONS: Record<string, string> = {
   cash: 'Banknote',
-  bank: 'Building2',
+  chequing: 'Building2',
   credit_card: 'CreditCard',
   savings: 'PiggyBank',
   investment: 'TrendingUp',
   other: 'Wallet',
-}
+};
 
 export const DEFAULT_EXPENSE_CATEGORIES = [
   { name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#ef4444' },
@@ -32,7 +32,7 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   { name: 'Travel', icon: 'Plane', color: '#06b6d4' },
   { name: 'Gifts', icon: 'Gift', color: '#d946ef' },
   { name: 'Other', icon: 'MoreHorizontal', color: '#6b7280' },
-]
+];
 
 export const DEFAULT_INCOME_CATEGORIES = [
   { name: 'Salary', icon: 'Briefcase', color: '#22c55e' },
@@ -40,7 +40,7 @@ export const DEFAULT_INCOME_CATEGORIES = [
   { name: 'Investment Returns', icon: 'TrendingUp', color: '#8b5cf6' },
   { name: 'Gifts Received', icon: 'Gift', color: '#ec4899' },
   { name: 'Other Income', icon: 'Plus', color: '#6b7280' },
-]
+];
 
 export const RECURRENCE_LABELS: Record<string, string> = {
   daily: 'Daily',
@@ -48,4 +48,4 @@ export const RECURRENCE_LABELS: Record<string, string> = {
   biweekly: 'Every 2 Weeks',
   monthly: 'Monthly',
   yearly: 'Yearly',
-}
+};
