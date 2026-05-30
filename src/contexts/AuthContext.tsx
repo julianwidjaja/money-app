@@ -21,15 +21,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    async function ensureProfile(u: User) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', u.id)
+        .single()
+      if (!data) {
+        await supabase.from('profiles').insert({
+          id: u.id,
+          display_name: u.user_metadata?.full_name || u.email || 'User',
+          avatar_url: u.user_metadata?.avatar_url || null,
+        })
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (session?.user) ensureProfile(session.user)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (session?.user) ensureProfile(session.user)
       setLoading(false)
     })
 
