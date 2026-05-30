@@ -49,14 +49,21 @@ export function useAccounts() {
   }
 
   async function deleteAccount(id: string) {
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('accounts')
-      .update({ is_archived: true })
+      .delete()
       .eq('id', id)
-    if (!error) {
-      setAccounts(prev => prev.filter(a => a.id !== id))
+
+    if (deleteError) {
+      const { error: archiveError } = await supabase
+        .from('accounts')
+        .update({ is_archived: true })
+        .eq('id', id)
+      if (archiveError) return { error: archiveError }
     }
-    return { error }
+
+    setAccounts(prev => prev.filter(a => a.id !== id))
+    return { error: null }
   }
 
   return { accounts, loading, createAccount, updateAccount, deleteAccount, refetch: fetchAccounts }
