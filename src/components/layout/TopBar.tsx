@@ -41,7 +41,7 @@ export function TopBar() {
     .toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'
 
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b border-border">
       <div className="flex items-center justify-between h-14 px-4 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-1.5 text-primary hover:opacity-80 transition-opacity no-underline">
