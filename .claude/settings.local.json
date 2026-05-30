@@ -3,7 +3,14 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:www.realbyteapps.com)",
-      "WebFetch(domain:help.realbyteapps.com)"
+      "WebFetch(domain:help.realbyteapps.com)",
+      "Bash(npm install *)",
+      "Bash(npx shadcn@latest init -d --style default --base-color neutral --css-variables true)",
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx shadcn@latest add card input dialog sheet tabs select popover dropdown-menu badge progress sonner label separator avatar scroll-area tooltip calendar -y)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }
