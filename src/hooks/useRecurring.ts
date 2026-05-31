@@ -27,7 +27,7 @@ export function useRecurring() {
     if (!user) return
     const { data, error } = await supabase
       .from('recurring_rules')
-      .insert({ ...rule, user_id: user.id })
+      .insert({ ...rule, user_id: user.id, last_generated_date: rule.start_date })
       .select()
       .single()
     if (!error && data) setRules(prev => [data as RecurringRule, ...prev])

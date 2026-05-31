@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useRecurring } from '@/hooks/useRecurring'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,10 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AmountInput } from '@/components/common/AmountInput'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { formatCurrency } from '@/lib/utils'
+import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { getCategoryIcon } from '@/lib/icons'
-import { Plus, Trash2, Users } from 'lucide-react'
+import { Plus, Trash2, Users, Repeat } from 'lucide-react'
+import type { RecurrenceFrequency, EntryType } from '@/types'
 
 interface Reimbursement {
   id: string
@@ -43,6 +46,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
   const { accounts } = useAccounts()
   const { expenseCategories, incomeCategories } = useCategories()
   const { createSimpleTransaction, updateSimpleTransaction, createSplitTransaction, updateSplitTransaction } = useTransactions()
+  const { createRule } = useRecurring()
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories
   const isEdit = !!editData
@@ -53,6 +57,9 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
   const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
   const [note, setNote] = useState(editData?.note ?? '')
   const [loading, setLoading] = useState(false)
+
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
 
   const [isSplit, setIsSplit] = useState(editData?.isSplit ?? false)
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>(
@@ -116,7 +123,13 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       setLoading(false)
 
       if (result?.error) toast.error('Failed to save transaction')
-      else { toast.success(isEdit ? 'Transaction updated' : 'Expense added'); onSuccess() }
+      else {
+        if (isRecurring && !isEdit) {
+          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
+        }
+        toast.success(isEdit ? 'Transaction updated' : 'Expense added')
+        onSuccess()
+      }
       return
     }
 
@@ -130,6 +143,9 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
     if (result?.error) {
       toast.error('Failed to save transaction')
     } else {
+      if (isRecurring && !isEdit) {
+        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
+      }
       toast.success(isEdit ? 'Transaction updated' : `${type === 'expense' ? 'Expense' : 'Income'} added`)
       onSuccess()
     }
@@ -183,6 +199,41 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
         <Label>Note (optional)</Label>
         <Input placeholder="Add a note..." value={note} onChange={e => setNote(e.target.value)} />
       </div>
+
+      {/* Recurring toggle */}
+      {!isEdit && (
+        <>
+          <button
+            type="button"
+            onClick={() => setIsRecurring(!isRecurring)}
+            className={`flex items-center gap-2 w-full px-4 py-3 rounded-lg border text-sm transition-colors ${
+              isRecurring
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-primary/50'
+            }`}
+          >
+            <Repeat className="w-4 h-4" />
+            <span className="flex-1 text-left">Make recurring</span>
+            <div className={`w-9 h-5 rounded-full transition-colors ${isRecurring ? 'bg-primary' : 'bg-muted'}`}>
+              <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${isRecurring ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {isRecurring && (
+            <div className="space-y-1.5">
+              <Label>Frequency</Label>
+              <Select value={frequency} onValueChange={(v) => v != null && setFrequency(v as RecurrenceFrequency)} items={Object.entries(RECURRENCE_LABELS).map(([value, label]) => ({ value, label }))}>
+                <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Split toggle — only for expenses */}
       {type === 'expense' && (
