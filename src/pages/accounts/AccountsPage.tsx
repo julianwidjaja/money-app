@@ -29,14 +29,14 @@ export function AccountsPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
-  const [type, setType] = useState<AccountType>('bank')
+  const [type, setType] = useState<AccountType | ''>('')
   const [initialBalance, setInitialBalance] = useState(0)
   const [saving, setSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
-  const [editType, setEditType] = useState<AccountType>('bank')
+  const [editType, setEditType] = useState<AccountType | ''>('')
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -57,16 +57,17 @@ export function AccountsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { toast.error('Enter account name'); return }
+    if (!type) { toast.error('Select account type'); return }
     setSaving(true)
     const result = await createAccount({
-      name: name.trim(), type, initial_balance: initialBalance,
+      name: name.trim(), type: type as AccountType, initial_balance: initialBalance,
       icon: null, color: null, is_archived: false, sort_order: accounts.length,
     })
     setSaving(false)
     if (result?.error) { toast.error('Failed to create account') }
     else {
       toast.success('Account created')
-      setCreateOpen(false); setName(''); setType('bank'); setInitialBalance(0); refetch()
+      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); refetch()
     }
   }
 
@@ -79,8 +80,9 @@ export function AccountsPage() {
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editName.trim()) { toast.error('Enter account name'); return }
+    if (!editType) { toast.error('Select account type'); return }
     setSaving(true)
-    const result = await updateAccount(editId, { name: editName.trim(), type: editType })
+    const result = await updateAccount(editId, { name: editName.trim(), type: editType as AccountType })
     setSaving(false)
     if (result?.error) { toast.error('Failed to update account') }
     else { toast.success('Account updated'); setEditOpen(false); refetch() }
@@ -125,8 +127,8 @@ export function AccountsPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Type</Label>
-                    <Select value={type} onValueChange={(v) => v != null && setType(v as AccountType)} items={Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={type || undefined} onValueChange={(v) => v != null && setType(v as AccountType)} items={Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}>
+                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => (
                           <SelectItem key={value} value={value}>{label}</SelectItem>
