@@ -7,31 +7,39 @@ interface AmountInputProps {
   onChange: (cents: number) => void
   className?: string
   placeholder?: string
+  allowNegative?: boolean
 }
 
-export function AmountInput({ value, onChange, className, placeholder = '0.00' }: AmountInputProps) {
+export function AmountInput({ value, onChange, className, placeholder = '0.00', allowNegative = false }: AmountInputProps) {
   const [displayValue, setDisplayValue] = useState(
-    value > 0 ? (value / 100).toFixed(2) : ''
+    value !== 0 ? (value / 100).toFixed(2) : ''
   )
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/[^0-9.]/g, '')
-    const parts = raw.split('.')
-    if (parts.length > 2) return
+    const allowed = allowNegative ? /[^0-9.\-]/g : /[^0-9.]/g
+    let raw = e.target.value.replace(allowed, '')
 
+    if (allowNegative) {
+      const hasLeadingMinus = raw.startsWith('-')
+      raw = (hasLeadingMinus ? '-' : '') + raw.replace(/-/g, '')
+    }
+
+    const withoutMinus = raw.replace('-', '')
+    const parts = withoutMinus.split('.')
+    if (parts.length > 2) return
     if (parts[1] && parts[1].length > 2) return
 
     setDisplayValue(raw)
     const num = parseFloat(raw)
     if (!isNaN(num)) {
       onChange(Math.round(num * 100))
-    } else if (raw === '' || raw === '.') {
+    } else if (raw === '' || raw === '.' || raw === '-') {
       onChange(0)
     }
   }
 
   function handleBlur() {
-    if (value > 0) {
+    if (value !== 0) {
       setDisplayValue((value / 100).toFixed(2))
     } else {
       setDisplayValue('')

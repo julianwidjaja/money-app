@@ -138,7 +138,7 @@ export function AccountsPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Current Balance</Label>
-                    <AmountInput value={initialBalance} onChange={setInitialBalance} />
+                    <AmountInput value={initialBalance} onChange={setInitialBalance} allowNegative />
                   </div>
                   <Button type="submit" className="w-full" disabled={saving}>
                     {saving ? 'Creating...' : 'Create Account'}
