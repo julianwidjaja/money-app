@@ -32,8 +32,8 @@ export function AccountDetailPage() {
           {balance ? (
             <CurrencyDisplay
               cents={balance.current_balance}
-              type={account.type === 'credit_card' ? 'expense' : 'neutral'}
-              showSign={account.type === 'credit_card'}
+              type={balance.current_balance < 0 ? 'expense' : 'neutral'}
+              showSign={balance.current_balance < 0}
               className="text-3xl font-bold mt-2"
             />
           ) : (

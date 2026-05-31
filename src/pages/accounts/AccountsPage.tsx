@@ -164,7 +164,7 @@ export function AccountsPage() {
                       <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[b.type]}</p>
                     </Link>
                     <div className="flex items-center gap-2">
-                      <CurrencyDisplay cents={b.current_balance} type={b.type === 'credit_card' ? 'expense' : 'neutral'} showSign={b.type === 'credit_card'} />
+                      <CurrencyDisplay cents={b.current_balance} type={b.current_balance < 0 ? 'expense' : 'neutral'} showSign={b.current_balance < 0} />
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(b.account_id)}>
                         <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                       </Button>
