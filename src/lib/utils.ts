@@ -14,7 +14,9 @@ export function formatCurrency(cents: number): string {
 }
 
 export function formatDate(date: string | Date, format: 'short' | 'long' | 'month' = 'short'): string {
-  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date
+  const d = typeof date === 'string'
+    ? (date.includes('T') ? new Date(date) : new Date(date + 'T00:00:00'))
+    : date
   switch (format) {
     case 'short':
       return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })

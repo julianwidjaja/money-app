@@ -19,6 +19,7 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { CategoriesSettingsPage } from '@/pages/settings/CategoriesSettingsPage'
 import { RecurringSettingsPage } from '@/pages/settings/RecurringSettingsPage'
 import { ExportPage } from '@/pages/settings/ExportPage'
+import { FeedbackPage } from '@/pages/settings/FeedbackPage'
 import type { ReactNode } from 'react'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="settings/categories" element={<CategoriesSettingsPage />} />
               <Route path="settings/recurring" element={<RecurringSettingsPage />} />
               <Route path="settings/export" element={<ExportPage />} />
+              <Route path="settings/feedback" element={<FeedbackPage />} />
             </Route>
           </Routes>
           <Toaster />

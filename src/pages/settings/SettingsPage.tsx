@@ -4,7 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Tags, Repeat, Download, Moon, Sun, LogOut, Wallet, ChevronRight } from 'lucide-react'
+import { Tags, Repeat, Download, Moon, Sun, LogOut, Wallet, ChevronRight, MessageSquare } from 'lucide-react'
 
 const menuItems = [
   { to: '/accounts', icon: Wallet, label: 'Accounts' },
@@ -12,6 +12,7 @@ const menuItems = [
   { to: '/settings/recurring', icon: Repeat, label: 'Recurring Transactions' },
   { to: '/budgets', icon: Wallet, label: 'Budgets' },
   { to: '/settings/export', icon: Download, label: 'Export Data' },
+  { to: '/settings/feedback', icon: MessageSquare, label: 'Report Bug / Feedback' },
 ]
 
 export function SettingsPage() {
