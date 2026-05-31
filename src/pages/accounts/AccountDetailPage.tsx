@@ -53,11 +53,19 @@ export function AccountDetailPage() {
       ) : (
         <div className="space-y-1.5">
           {transactions.map(tx => {
-            const entry = tx.entries.find(e => e.account_id === id) || tx.entries[0]
-            if (!entry) return null
-            const cat = entry.category
-            const isTransfer = entry.type === 'transfer_out' || entry.type === 'transfer_in'
-            const isIncome = entry.type === 'income' || entry.type === 'transfer_in' || entry.type === 'reimbursement'
+            const entriesForAccount = tx.entries.filter(e => e.account_id === id)
+            if (entriesForAccount.length === 0) return null
+
+            const netAmount = entriesForAccount.reduce((sum, e) => {
+              if (e.type === 'income' || e.type === 'transfer_in' || e.type === 'reimbursement') return sum + e.amount
+              if (e.type === 'expense' || e.type === 'transfer_out') return sum - e.amount
+              return sum
+            }, 0)
+
+            const mainEntry = tx.entries.find(e => e.type === 'expense' || e.type === 'income') || entriesForAccount[0]
+            const cat = mainEntry.category
+            const isTransfer = entriesForAccount[0].type === 'transfer_out' || entriesForAccount[0].type === 'transfer_in'
+            const isNet = netAmount >= 0
             const Icon = isTransfer ? ArrowLeftRight : getCategoryIcon(cat?.icon)
 
             return (
@@ -65,18 +73,21 @@ export function AccountDetailPage() {
                 <Card className="hover:bg-accent/50 transition-colors">
                   <CardContent className="flex items-center gap-3 py-3 px-4">
                     <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
                       style={{ backgroundColor: (cat?.color || '#6b7280') + '20' }}
                     >
                       <Icon className="w-4 h-4" style={{ color: cat?.color || '#6b7280' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{tx.description || cat?.name || 'Transaction'}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(tx.date)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(tx.date)}
+                        {tx.type === 'split' && ' · Split'}
+                      </p>
                     </div>
                     <CurrencyDisplay
-                      cents={entry.amount}
-                      type={isIncome ? 'income' : 'expense'}
+                      cents={Math.abs(netAmount)}
+                      type={isNet ? 'income' : 'expense'}
                     />
                   </CardContent>
                 </Card>
