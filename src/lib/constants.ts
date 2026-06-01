@@ -1,8 +1,10 @@
+export const ACCOUNT_TYPE_ORDER = ['cash', 'chequing', 'credit_card', 'savings', 'investment', 'other'];
+
 export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  cash: 'Cash',
   chequing: 'Chequing Account',
-  credit_card: 'Credit Card',
   savings: 'Savings Account',
+  credit_card: 'Credit Card',
+  cash: 'Cash',
   investment: 'Investment',
   other: 'Other',
 };

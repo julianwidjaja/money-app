@@ -65,9 +65,9 @@ export function DashboardPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {balances.map(b => (
-              <Link key={b.account_id} to={`/accounts/${b.account_id}`}>
+          <div className="flex flex-col gap-3">
+            {balances.slice(0, 3).map(b => (
+              <Link key={b.account_id} to={`/accounts/${b.account_id}`} className="block">
                 <Card className="hover:bg-accent/50 transition-colors">
                   <CardContent className="flex items-center justify-between py-3 px-4">
                     <div>
