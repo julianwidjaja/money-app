@@ -9,8 +9,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getCategoryIcon, AVAILABLE_ICONS, iconMap } from '@/lib/icons'
 import { toast } from 'sonner'
-import { Plus, Trash2 } from 'lucide-react'
-import type { CategoryType } from '@/types'
+import { Plus, Trash2, GripVertical } from 'lucide-react'
+import type { Category, CategoryType } from '@/types'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
@@ -18,14 +36,55 @@ const COLORS = [
   '#0ea5e9', '#a855f7', '#06b6d4', '#d946ef', '#6b7280',
 ]
 
+function SortableCategoryItem({ category, onDelete }: { category: Category; onDelete: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: category.id })
+  const Icon = getCategoryIcon(category.icon)
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.8 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={isDragging ? 'shadow-lg' : ''}>
+        <CardContent className="flex items-center gap-2 py-3 px-4">
+          <button
+            className="cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 text-muted-foreground hover:text-foreground"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: category.color + '20' }}>
+            <Icon className="w-4 h-4" style={{ color: category.color }} />
+          </div>
+          <span className="flex-1 text-sm">{category.name}</span>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(category.id)}>
+            <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function CategoriesSettingsPage() {
-  const { expenseCategories, incomeCategories, createCategory, deleteCategory } = useCategories()
+  const { expenseCategories, incomeCategories, createCategory, deleteCategory, reorderCategories } = useCategories()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [type, setType] = useState<CategoryType>('expense')
   const [icon, setIcon] = useState('MoreHorizontal')
   const [color, setColor] = useState('#6b7280')
   const [saving, setSaving] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -47,26 +106,27 @@ export function CategoriesSettingsPage() {
     else toast.success('Category removed')
   }
 
-  function renderCategoryList(categories: typeof expenseCategories) {
+  function handleDragEnd(categories: Category[], event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = categories.findIndex(c => c.id === active.id)
+    const newIndex = categories.findIndex(c => c.id === over.id)
+    const reordered = arrayMove(categories, oldIndex, newIndex).map((c, i) => ({ ...c, sort_order: i }))
+    reorderCategories(reordered)
+  }
+
+  function renderCategoryList(categories: Category[]) {
     return (
-      <div className="space-y-1.5 mt-4">
-        {categories.map(c => {
-          const Icon = getCategoryIcon(c.icon)
-          return (
-            <Card key={c.id}>
-              <CardContent className="flex items-center gap-3 py-3 px-4">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: c.color + '20' }}>
-                  <Icon className="w-4 h-4" style={{ color: c.color }} />
-                </div>
-                <span className="flex-1 text-sm">{c.name}</span>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(c.id)}>
-                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                </Button>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(categories, e)}>
+        <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-1.5 mt-4">
+            {categories.map(c => (
+              <SortableCategoryItem key={c.id} category={c} onDelete={handleDelete} />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     )
   }
 

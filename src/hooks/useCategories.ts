@@ -164,6 +164,24 @@ export function useCategories() {
     return { error: null };
   }
 
+  async function reorderCategories(reordered: Category[]) {
+    setCategories((prev) => {
+      const reorderedIds = new Set(reordered.map((c) => c.id));
+      const unchanged = prev.filter((c) => !reorderedIds.has(c.id));
+      return [...unchanged, ...reordered].sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'expense' ? -1 : 1;
+        return a.sort_order - b.sort_order;
+      });
+    });
+
+    for (let i = 0; i < reordered.length; i++) {
+      await supabase
+        .from('categories')
+        .update({ sort_order: i })
+        .eq('id', reordered[i].id);
+    }
+  }
+
   return {
     categories,
     expenseCategories,
@@ -172,6 +190,7 @@ export function useCategories() {
     createCategory,
     updateCategory,
     deleteCategory,
+    reorderCategories,
     refetch,
   };
 }
