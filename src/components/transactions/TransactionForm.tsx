@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { getCategoryIcon } from '@/lib/icons'
 import { Plus, Trash2, Users, Repeat } from 'lucide-react'
+import { NameInput } from '@/components/common/NameInput'
 import type { RecurrenceFrequency, EntryType } from '@/types'
 
 interface Reimbursement {
@@ -31,7 +32,8 @@ export interface SimpleEditData {
   accountId: string
   categoryId: string
   date: string
-  note: string
+  name: string
+  description: string
   isSplit?: boolean
   reimbursements?: Reimbursement[]
 }
@@ -55,7 +57,8 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
   const [accountId, setAccountId] = useState(editData?.accountId ?? '')
   const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
   const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
-  const [note, setNote] = useState(editData?.note ?? '')
+  const [name, setName] = useState(editData?.name ?? '')
+  const [description, setDescription] = useState(editData?.description ?? '')
   const [loading, setLoading] = useState(false)
 
   const [isRecurring, setIsRecurring] = useState(false)
@@ -110,7 +113,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
         accountId,
         categoryId,
         date,
-        description: note || 'Split transaction',
+        description: name || 'Split transaction',
         reimbursements: validReimbursements.map(r => ({
           friendName: r.friendName,
           amount: r.amount,
@@ -125,7 +128,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       if (result?.error) toast.error('Failed to save transaction')
       else {
         if (isRecurring && !isEdit) {
-          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
+          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
         }
         toast.success(isEdit ? 'Transaction updated' : 'Expense added')
         onSuccess()
@@ -134,7 +137,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
     }
 
     setLoading(true)
-    const input = { type, amount, accountId, categoryId, date, note: note || undefined }
+    const input = { type, amount, accountId, categoryId, date, name: name || undefined, description: description || undefined }
     const result = isEdit
       ? await updateSimpleTransaction(editData!.groupId, input)
       : await createSimpleTransaction(input)
@@ -144,7 +147,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       toast.error('Failed to save transaction')
     } else {
       if (isRecurring && !isEdit) {
-        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
+        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
       }
       toast.success(isEdit ? 'Transaction updated' : `${type === 'expense' ? 'Expense' : 'Income'} added`)
       onSuccess()
@@ -196,8 +199,18 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       </div>
 
       <div className="space-y-1.5">
-        <Label>Note (optional)</Label>
-        <Input placeholder="Add a note..." value={note} onChange={e => setNote(e.target.value)} />
+        <Label>Name (optional)</Label>
+        <NameInput value={name} onChange={setName} />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Description (optional)</Label>
+        <textarea
+          className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none min-h-[60px] resize-y dark:bg-input/30"
+          placeholder="Add more details..."
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
       </div>
 
       {/* Recurring toggle */}

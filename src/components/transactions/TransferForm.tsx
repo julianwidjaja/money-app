@@ -11,6 +11,7 @@ import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ArrowDown, Repeat } from 'lucide-react'
+import { NameInput } from '@/components/common/NameInput'
 import type { RecurrenceFrequency, EntryType } from '@/types'
 
 export interface TransferEditData {
@@ -19,7 +20,8 @@ export interface TransferEditData {
   fromAccountId: string
   toAccountId: string
   date: string
-  note: string
+  name: string
+  description: string
 }
 
 interface TransferFormProps {
@@ -37,7 +39,8 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
   const [fromAccountId, setFromAccountId] = useState(editData?.fromAccountId ?? '')
   const [toAccountId, setToAccountId] = useState(editData?.toAccountId ?? '')
   const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
-  const [note, setNote] = useState(editData?.note ?? '')
+  const [name, setName] = useState(editData?.name ?? '')
+  const [description, setDescription] = useState(editData?.description ?? '')
   const [loading, setLoading] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
@@ -52,7 +55,7 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
     if (fromAccountId === toAccountId) { toast.error('Accounts must be different'); return }
 
     setLoading(true)
-    const input = { amount, fromAccountId, toAccountId, date, note: note || undefined }
+    const input = { amount, fromAccountId, toAccountId, date, name: name || undefined, description: description || undefined }
 
     const result = isEdit
       ? await updateTransfer(editData.groupId, input)
@@ -63,7 +66,7 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
       toast.error('Failed to save transfer')
     } else {
       if (isRecurring && !isEdit) {
-        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || 'Transfer', template_account_id: fromAccountId, template_category_id: null, template_type: 'transfer_out' as EntryType, template_amount: amount })
+        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Transfer', template_account_id: fromAccountId, template_category_id: null, template_type: 'transfer_out' as EntryType, template_amount: amount })
       }
       toast.success(isEdit ? 'Transfer updated' : 'Transfer added')
       onSuccess()
@@ -111,8 +114,18 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label>Note (optional)</Label>
-        <Input placeholder="Add a note..." value={note} onChange={e => setNote(e.target.value)} />
+        <Label>Name (optional)</Label>
+        <NameInput value={name} onChange={setName} placeholder="e.g. Savings transfer..." />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Description (optional)</Label>
+        <textarea
+          className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none min-h-[60px] resize-y dark:bg-input/30"
+          placeholder="Add more details..."
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
       </div>
 
       {/* Recurring toggle */}

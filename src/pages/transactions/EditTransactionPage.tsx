@@ -64,7 +64,8 @@ export function EditTransactionPage() {
       accountId: mainEntry.account_id,
       categoryId: mainEntry.category_id || '',
       date: tx.date,
-      note: mainEntry.note || '',
+      name: tx.description || '',
+      description: mainEntry.note || '',
     }
 
     return (
@@ -92,7 +93,8 @@ export function EditTransactionPage() {
       fromAccountId: outEntry.account_id,
       toAccountId: inEntry.account_id,
       date: tx.date,
-      note: outEntry.note || '',
+      name: tx.description || '',
+      description: outEntry.note || '',
     }
 
     return (
@@ -116,7 +118,8 @@ export function EditTransactionPage() {
       accountId: expenseEntry.account_id,
       categoryId: expenseEntry.category_id || '',
       date: tx.date,
-      note: tx.description || '',
+      name: tx.description || '',
+      description: expenseEntry.note || '',
       isSplit: true,
       reimbursements: reimbursementEntries.map(r => ({
         id: r.id,
