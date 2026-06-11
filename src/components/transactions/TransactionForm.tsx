@@ -38,13 +38,23 @@ export interface SimpleEditData {
   reimbursements?: Reimbursement[]
 }
 
+interface SharedFormState {
+  amount: number
+  date: string
+  name: string
+  description: string
+  accountId: string
+}
+
 interface TransactionFormProps {
   type: 'income' | 'expense'
   onSuccess: () => void
   editData?: SimpleEditData
+  shared?: SharedFormState
+  onSharedChange?: (updates: Partial<SharedFormState>) => void
 }
 
-export function TransactionForm({ type, onSuccess, editData }: TransactionFormProps) {
+export function TransactionForm({ type, onSuccess, editData, shared, onSharedChange }: TransactionFormProps) {
   const { accounts } = useAccounts()
   const { expenseCategories, incomeCategories } = useCategories()
   const { createSimpleTransaction, updateSimpleTransaction, createSplitTransaction, updateSplitTransaction } = useTransactions()
@@ -52,13 +62,27 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories
   const isEdit = !!editData
+  const hasShared = !!shared
 
-  const [amount, setAmount] = useState(editData?.amount ?? 0)
-  const [accountId, setAccountId] = useState(editData?.accountId ?? '')
+  const [_amount, _setAmount] = useState(editData?.amount ?? 0)
+  const [_accountId, _setAccountId] = useState(editData?.accountId ?? '')
+  const [_date, _setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [_name, _setName] = useState(editData?.name ?? '')
+  const [_description, _setDescription] = useState(editData?.description ?? '')
+
+  const amount = hasShared ? shared.amount : _amount
+  const accountId = hasShared ? shared.accountId : _accountId
+  const date = hasShared ? shared.date : _date
+  const name = hasShared ? shared.name : _name
+  const description = hasShared ? shared.description : _description
+
+  function setAmount(v: number) { hasShared ? onSharedChange?.({ amount: v }) : _setAmount(v) }
+  function setAccountId(v: string) { hasShared ? onSharedChange?.({ accountId: v }) : _setAccountId(v) }
+  function setDate(v: string) { hasShared ? onSharedChange?.({ date: v }) : _setDate(v) }
+  function setName(v: string) { hasShared ? onSharedChange?.({ name: v }) : _setName(v) }
+  function setDescription(v: string) { hasShared ? onSharedChange?.({ description: v }) : _setDescription(v) }
+
   const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
-  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
-  const [name, setName] = useState(editData?.name ?? '')
-  const [description, setDescription] = useState(editData?.description ?? '')
   const [loading, setLoading] = useState(false)
 
   const [isRecurring, setIsRecurring] = useState(false)

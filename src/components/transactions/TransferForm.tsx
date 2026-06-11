@@ -24,23 +24,45 @@ export interface TransferEditData {
   description: string
 }
 
+interface SharedFormState {
+  amount: number
+  date: string
+  name: string
+  description: string
+  accountId: string
+}
+
 interface TransferFormProps {
   onSuccess: () => void
   editData?: TransferEditData
+  shared?: SharedFormState
+  onSharedChange?: (updates: Partial<SharedFormState>) => void
 }
 
-export function TransferForm({ onSuccess, editData }: TransferFormProps) {
+export function TransferForm({ onSuccess, editData, shared, onSharedChange }: TransferFormProps) {
   const { accounts } = useAccounts()
   const { createTransfer, updateTransfer } = useTransactions()
   const { createRule } = useRecurring()
   const isEdit = !!editData
+  const hasShared = !!shared
 
-  const [amount, setAmount] = useState(editData?.amount ?? 0)
-  const [fromAccountId, setFromAccountId] = useState(editData?.fromAccountId ?? '')
+  const [_amount, _setAmount] = useState(editData?.amount ?? 0)
+  const [_date, _setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [_name, _setName] = useState(editData?.name ?? '')
+  const [_description, _setDescription] = useState(editData?.description ?? '')
+
+  const amount = hasShared ? shared.amount : _amount
+  const date = hasShared ? shared.date : _date
+  const name = hasShared ? shared.name : _name
+  const description = hasShared ? shared.description : _description
+
+  function setAmount(v: number) { hasShared ? onSharedChange?.({ amount: v }) : _setAmount(v) }
+  function setDate(v: string) { hasShared ? onSharedChange?.({ date: v }) : _setDate(v) }
+  function setName(v: string) { hasShared ? onSharedChange?.({ name: v }) : _setName(v) }
+  function setDescription(v: string) { hasShared ? onSharedChange?.({ description: v }) : _setDescription(v) }
+
+  const [fromAccountId, setFromAccountId] = useState(editData?.fromAccountId ?? shared?.accountId ?? '')
   const [toAccountId, setToAccountId] = useState(editData?.toAccountId ?? '')
-  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
-  const [name, setName] = useState(editData?.name ?? '')
-  const [description, setDescription] = useState(editData?.description ?? '')
   const [loading, setLoading] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
@@ -82,7 +104,7 @@ export function TransferForm({ onSuccess, editData }: TransferFormProps) {
 
       <div className="space-y-1.5">
         <Label>From Account</Label>
-        <Select value={fromAccountId} onValueChange={(v) => v != null && setFromAccountId(v)} items={accountItems}>
+        <Select value={fromAccountId} onValueChange={(v) => { if (v != null) { setFromAccountId(v); onSharedChange?.({ accountId: v }) } }} items={accountItems}>
           <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
             {accounts.map(a => (
