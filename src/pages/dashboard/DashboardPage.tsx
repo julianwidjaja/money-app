@@ -24,7 +24,7 @@ export function DashboardPage() {
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
   const { budgetStatus } = useBudgets()
   const { generatePendingTransactions } = useRecurring()
-  const { dueReminders, dismissReminder } = useReminders()
+  const { dueReminders, dismissReminder, getReminderDetails } = useReminders()
   const { isFeatureEnabled } = useSettings()
 
   const accountNameMap = new Map(balances.map(b => [b.account_id, b.name]))
@@ -45,7 +45,7 @@ export function DashboardPage() {
     <div className="space-y-6 py-4">
       {/* Reminder Banner */}
       {isFeatureEnabled('feature_reminders') && dueReminders.length > 0 && (
-        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} onDismiss={dismissReminder} />
+        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} onDismiss={dismissReminder} onGetDetails={getReminderDetails} />
       )}
 
       {/* Net Balance */}

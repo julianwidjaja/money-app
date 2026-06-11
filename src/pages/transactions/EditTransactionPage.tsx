@@ -66,6 +66,7 @@ export function EditTransactionPage() {
       date: tx.date,
       name: tx.description || '',
       description: mainEntry.note || '',
+      fundingAccountId: mainEntry.funding_account_id || undefined,
     }
 
     return (
@@ -120,6 +121,7 @@ export function EditTransactionPage() {
       date: tx.date,
       name: tx.description || '',
       description: expenseEntry.note || '',
+      fundingAccountId: expenseEntry.funding_account_id || undefined,
       isSplit: true,
       reimbursements: reimbursementEntries.map(r => ({
         id: r.id,

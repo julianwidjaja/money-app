@@ -11,6 +11,7 @@ interface CreateSimpleTransactionInput {
   date: string
   name?: string
   description?: string
+  fundingAccountId?: string
 }
 
 interface CreateTransferInput {
@@ -126,6 +127,7 @@ export function useTransactions(options?: FetchOptions) {
         type: input.type as EntryType,
         amount: input.amount,
         is_personal_expense: true,
+        funding_account_id: input.fundingAccountId || null,
         note: input.description || null,
       })
 
@@ -231,6 +233,7 @@ export function useTransactions(options?: FetchOptions) {
         category_id: input.categoryId,
         type: input.type as EntryType,
         amount: input.amount,
+        funding_account_id: input.fundingAccountId || null,
         note: input.description || null,
       })
       .eq('group_id', groupId)

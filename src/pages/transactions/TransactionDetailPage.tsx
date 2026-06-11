@@ -126,6 +126,12 @@ export function TransactionDetailPage() {
                 </div>
               </div>
             )}
+            {(mainEntry as any)?.funding_account?.name && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Funded by</span>
+                <span>{(mainEntry as any).funding_account.name}</span>
+              </div>
+            )}
           </div>
 
           {isSplit && reimbursements.length > 0 && (

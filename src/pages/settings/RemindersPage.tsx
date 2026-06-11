@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useReminders } from '@/hooks/useReminders'
 import { useAccounts } from '@/hooks/useAccounts'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -8,12 +10,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
-import { Bell, Plus, Trash2 } from 'lucide-react'
-import { format, addWeeks, addMonths, addYears } from 'date-fns'
+import { Bell, Plus, Trash2, ArrowRight, History } from 'lucide-react'
+import { format, addMonths, addYears } from 'date-fns'
+import type { FundingBreakdown, ReminderHistoryItem } from '@/hooks/useReminders'
 
 const frequencyItems = [
   { value: 'weekly', label: 'Weekly' },
@@ -25,6 +30,7 @@ const frequencyItems = [
 export function RemindersPage() {
   const { reminders, loading, createReminder, deleteReminder } = useReminders()
   const { accounts } = useAccounts()
+  const { user } = useAuth()
 
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -33,7 +39,34 @@ export function RemindersPage() {
   const [dueDay, setDueDay] = useState(1)
   const [saving, setSaving] = useState(false)
 
+  const [history, setHistory] = useState<(ReminderHistoryItem & { reminder_title?: string })[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+
   const accountItems = [{ value: 'none', label: 'No account' }, ...accounts.map(a => ({ value: a.id, label: a.name }))]
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+
+    supabase
+      .from('reminder_history')
+      .select('*, reminder:reminders(title)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }: { data: any[] | null }) => {
+        if (cancelled) return
+        if (data) {
+          setHistory(data.map(h => ({
+            ...h,
+            reminder_title: h.reminder?.title || 'Deleted reminder',
+          })))
+        }
+        setHistoryLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [user])
 
   function computeFirstDue(): string {
     const today = new Date()
@@ -177,6 +210,7 @@ export function RemindersPage() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {RECURRENCE_LABELS[r.frequency] || r.frequency} · Next: {formatDate(r.next_due, 'long')}
+                      {r.last_dismissed_at && ` · Last paid: ${formatDate(r.last_dismissed_at, 'short')}`}
                       {account && ` · ${account.name}`}
                     </p>
                   </div>
@@ -187,6 +221,62 @@ export function RemindersPage() {
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {/* Past Payments */}
+      {!historyLoading && history.length > 0 && (
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <History className="w-4 h-4" /> Past Payments
+          </h2>
+          <div className="space-y-2">
+            {history.map(h => {
+              const hTotal = (h.funded || []).reduce((s: number, f: FundingBreakdown) => s + f.total, 0) + (h.unfunded_total || 0)
+              const hasFunding = (h.funded || []).length > 0
+
+              return (
+                <Card key={h.id} className="opacity-80">
+                  <CardContent className="py-3 px-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{h.reminder_title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Paid {formatDate(h.period_end, 'long')}
+                        </p>
+                      </div>
+                      {hTotal > 0 && (
+                        <CurrencyDisplay cents={hTotal} type="expense" showSign={false} className="text-sm font-medium" />
+                      )}
+                    </div>
+
+                    {hasFunding && (
+                      <>
+                        <Separator />
+                        <div className="space-y-1.5">
+                          {(h.funded as FundingBreakdown[]).map((f: FundingBreakdown) => (
+                            <div key={f.funding_account_id} className="flex items-center gap-1.5 text-xs">
+                              <span className="text-muted-foreground">From</span>
+                              <span className="font-medium">{f.account_name}</span>
+                              <ArrowRight className="w-2.5 h-2.5 text-muted-foreground" />
+                              <span>{formatCurrency(f.total)}</span>
+                            </div>
+                          ))}
+                          {(h.unfunded_total || 0) > 0 && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <span className="text-muted-foreground">Other spending</span>
+                              <ArrowRight className="w-2.5 h-2.5 text-muted-foreground" />
+                              <span>{formatCurrency(h.unfunded_total)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

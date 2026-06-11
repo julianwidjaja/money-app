@@ -16,7 +16,7 @@ import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { getCategoryIcon } from '@/lib/icons'
-import { Plus, Trash2, Users, Repeat } from 'lucide-react'
+import { Plus, Trash2, Users, Repeat, ArrowRightLeft } from 'lucide-react'
 import { NameInput } from '@/components/common/NameInput'
 import type { RecurrenceFrequency, EntryType } from '@/types'
 
@@ -35,6 +35,7 @@ export interface SimpleEditData {
   date: string
   name: string
   description: string
+  fundingAccountId?: string
   isSplit?: boolean
   reimbursements?: Reimbursement[]
 }
@@ -86,6 +87,8 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
 
   const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
   const [loading, setLoading] = useState(false)
+
+  const [fundingAccountId, setFundingAccountId] = useState(editData?.fundingAccountId ?? '')
 
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
@@ -163,7 +166,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
     }
 
     setLoading(true)
-    const input = { type, amount, accountId, categoryId, date, name: name || undefined, description: description || undefined }
+    const input = { type, amount, accountId, categoryId, date, name: name || undefined, description: description || undefined, fundingAccountId: fundingAccountId || undefined }
     const result = isEdit
       ? await updateSimpleTransaction(editData!.groupId, input)
       : await createSimpleTransaction(input)
@@ -238,6 +241,46 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
           onChange={e => setDescription(e.target.value)}
         />
       </div>
+
+      {/* Fund from different account — only for expenses */}
+      {type === 'expense' && isFeatureEnabled('feature_funding') && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setFundingAccountId(fundingAccountId ? '' : accounts[0]?.id || '')}
+            className={`flex items-center gap-2 w-full px-4 py-3 rounded-lg border text-sm transition-colors ${
+              fundingAccountId
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-primary/50'
+            }`}
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+            <span className="flex-1 text-left">Fund from different account</span>
+            <div className={`w-9 h-5 rounded-full transition-colors ${fundingAccountId ? 'bg-primary' : 'bg-muted'}`}>
+              <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${fundingAccountId ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {fundingAccountId && (
+            <div className="space-y-1.5">
+              <Label>Funding Account</Label>
+              <Select
+                value={fundingAccountId}
+                onValueChange={(v) => v != null && setFundingAccountId(v)}
+                items={accounts.filter(a => a.id !== accountId).map(a => ({ value: a.id, label: a.name }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.filter(a => a.id !== accountId).map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">This amount will show in your CC payment reminder</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recurring toggle */}
       {!isEdit && isFeatureEnabled('feature_recurring') && (
