@@ -8,12 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { formatDate } from '@/lib/utils'
-import { Bug, Lightbulb, MessageSquare, Send } from 'lucide-react'
+import { Bug, Lightbulb, MessageSquare, Send, Check, Circle } from 'lucide-react'
 
 interface FeedbackItem {
   id: string
   type: string
   message: string
+  resolved: boolean
   created_at: string
 }
 
@@ -84,6 +85,9 @@ export function FeedbackPage() {
     }
   }
 
+  const unresolvedItems = feedbackList.filter(f => !f.resolved)
+  const resolvedItems = feedbackList.filter(f => f.resolved)
+
   return (
     <div className="space-y-4 py-4">
       <Card>
@@ -106,7 +110,7 @@ export function FeedbackPage() {
             <div className="space-y-1.5">
               <Label>Message</Label>
               <textarea
-                className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none min-h-[100px] resize-y"
+                className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none min-h-[100px] resize-y dark:bg-input/30"
                 placeholder="Describe the bug or feature you'd like..."
                 value={message}
                 onChange={e => setMessage(e.target.value)}
@@ -121,34 +125,75 @@ export function FeedbackPage() {
         </CardContent>
       </Card>
 
-      {/* Previous feedback */}
       {!loading && feedbackList.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Previous Feedback</h3>
-          <div className="space-y-2">
-            {feedbackList.map(f => {
-              const Icon = typeIcons[f.type] || MessageSquare
-              return (
-                <Card key={f.id}>
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-start gap-3">
-                      <Icon className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={typeColors[f.type] as 'default' | 'destructive' | 'secondary'}>
-                            {f.type === 'bug' ? 'Bug' : f.type === 'feature' ? 'Feature' : 'Other'}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">{formatDate(f.created_at, 'long')}</span>
+        <>
+          {unresolvedItems.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Open ({unresolvedItems.length})
+              </h3>
+              <div className="space-y-2">
+                {unresolvedItems.map(f => {
+                  const Icon = typeIcons[f.type] || MessageSquare
+                  return (
+                    <Card key={f.id}>
+                      <CardContent className="py-3 px-4">
+                        <div className="flex items-start gap-3">
+                          <Circle className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <Badge variant={typeColors[f.type] as 'default' | 'destructive' | 'secondary'}>
+                                <Icon className="w-3 h-3 mr-1" />
+                                {f.type === 'bug' ? 'Bug' : f.type === 'feature' ? 'Feature' : 'Other'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">{formatDate(f.created_at, 'long')}</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{f.message}</p>
+                          </div>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap">{f.message}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {resolvedItems.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Resolved ({resolvedItems.length})
+              </h3>
+              <div className="space-y-2">
+                {resolvedItems.map(f => {
+                  const Icon = typeIcons[f.type] || MessageSquare
+                  return (
+                    <Card key={f.id} className="opacity-60">
+                      <CardContent className="py-3 px-4">
+                        <div className="flex items-start gap-3">
+                          <Check className="w-4 h-4 mt-0.5 shrink-0 text-success" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <Badge variant="secondary">
+                                <Icon className="w-3 h-3 mr-1" />
+                                {f.type === 'bug' ? 'Bug' : f.type === 'feature' ? 'Feature' : 'Other'}
+                              </Badge>
+                              <Badge variant="secondary" className="text-success border-success/30">
+                                Resolved
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">{formatDate(f.created_at, 'long')}</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap line-through">{f.message}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -36,7 +36,7 @@ export function TransactionDetailPage() {
 
       const { data: entries } = await supabase
         .from('transaction_entries')
-        .select('*, account:accounts(*), category:categories(*)')
+        .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
         .eq('group_id', id)
 
       setTx({
@@ -124,6 +124,12 @@ export function TransactionDetailPage() {
                   {(() => { const Icon = getCategoryIcon(mainEntry.category.icon); return <Icon className="w-3.5 h-3.5" style={{ color: mainEntry.category.color }} /> })()}
                   <span>{mainEntry.category.name}</span>
                 </div>
+              </div>
+            )}
+            {(mainEntry as any)?.funding_account?.name && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Funded by</span>
+                <span>{(mainEntry as any).funding_account.name}</span>
               </div>
             )}
           </div>

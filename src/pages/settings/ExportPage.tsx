@@ -24,7 +24,7 @@ export function ExportPage() {
       .from('transaction_entries')
       .select(`
         *,
-        account:accounts(name, type),
+        account:accounts!transaction_entries_account_id_fkey(name, type),
         category:categories(name, type),
         group:transaction_groups!inner(date, type, description)
       `)

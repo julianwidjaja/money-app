@@ -24,6 +24,9 @@ const pageTitles: Record<string, string> = {
   '/settings/categories': 'Categories',
   '/settings/recurring': 'Recurring',
   '/settings/export': 'Export',
+  '/settings/features': 'Features',
+  '/settings/reminders': 'Reminders',
+  '/settings/feedback': 'Feedback',
 }
 
 export function TopBar() {

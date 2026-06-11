@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
-import { useAccountBalances } from '@/hooks/useAccounts'
+import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useRecurring } from '@/hooks/useRecurring'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
+import { useReminders } from '@/hooks/useReminders'
+import { useSettings } from '@/hooks/useSettings'
+import { ReminderBanner } from '@/components/dashboard/ReminderBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -16,10 +19,15 @@ import { Wallet, ArrowRight, TrendingDown } from 'lucide-react'
 import { getCategoryIcon } from '@/lib/icons'
 
 export function DashboardPage() {
-  const { balances, loading: balancesLoading } = useAccountBalances()
+  const { accounts } = useAccounts()
+  const { balances, loading: balancesLoading } = useAccountBalances(accounts.map(a => a.id))
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
   const { budgetStatus } = useBudgets()
   const { generatePendingTransactions } = useRecurring()
+  const { dueReminders, dismissReminder, getReminderDetails } = useReminders()
+  const { isFeatureEnabled } = useSettings()
+
+  const accountNameMap = new Map(balances.map(b => [b.account_id, b.name]))
 
   const now = new Date()
   const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -35,6 +43,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 py-4">
+      {/* Reminder Banner */}
+      {isFeatureEnabled('feature_reminders') && dueReminders.length > 0 && (
+        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} onDismiss={dismissReminder} onGetDetails={getReminderDetails} />
+      )}
+
       {/* Net Balance */}
       <Card>
         <CardContent className="pt-6 text-center">
@@ -172,7 +185,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-3">
             {transactions.map(tx => {
               const mainEntry = tx.entries.find(e => e.type === 'expense' || e.type === 'income') || tx.entries[0]
               if (!mainEntry) return null
@@ -182,7 +195,7 @@ export function DashboardPage() {
               const Icon = getCategoryIcon(cat?.icon)
 
               return (
-                <Link key={tx.id} to={`/transactions/${tx.id}`}>
+                <Link key={tx.id} to={`/transactions/${tx.id}`} className="block">
                   <Card className="hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center gap-3 py-3 px-4">
                       <div

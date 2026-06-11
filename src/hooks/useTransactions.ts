@@ -9,7 +9,9 @@ interface CreateSimpleTransactionInput {
   accountId: string
   categoryId: string
   date: string
-  note?: string
+  name?: string
+  description?: string
+  fundingAccountId?: string
 }
 
 interface CreateTransferInput {
@@ -17,7 +19,8 @@ interface CreateTransferInput {
   fromAccountId: string
   toAccountId: string
   date: string
-  note?: string
+  name?: string
+  description?: string
 }
 
 interface SplitReimbursement {
@@ -69,7 +72,7 @@ export function useTransactions(options?: FetchOptions) {
     const groupIds = groups.map((g: any) => g.id)
     let entriesQuery = supabase
       .from('transaction_entries')
-      .select('*, account:accounts(*), category:categories(*)')
+      .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
       .in('group_id', groupIds)
 
     if (options?.accountId) entriesQuery = entriesQuery.eq('account_id', options.accountId)
@@ -106,7 +109,7 @@ export function useTransactions(options?: FetchOptions) {
       .insert({
         user_id: user.id,
         type: 'simple',
-        description: input.note || null,
+        description: input.name || null,
         date: input.date,
       })
       .select()
@@ -124,7 +127,8 @@ export function useTransactions(options?: FetchOptions) {
         type: input.type as EntryType,
         amount: input.amount,
         is_personal_expense: true,
-        note: input.note || null,
+        funding_account_id: input.fundingAccountId || null,
+        note: input.description || null,
       })
 
     if (!entryError) await fetchTransactions()
@@ -139,7 +143,7 @@ export function useTransactions(options?: FetchOptions) {
       .insert({
         user_id: user.id,
         type: 'transfer',
-        description: input.note || null,
+        description: input.name || null,
         date: input.date,
       })
       .select()
@@ -157,7 +161,7 @@ export function useTransactions(options?: FetchOptions) {
           type: 'transfer_out' as EntryType,
           amount: input.amount,
           is_personal_expense: false,
-          note: input.note || null,
+          note: input.description || null,
         },
         {
           group_id: group.id,
@@ -166,7 +170,7 @@ export function useTransactions(options?: FetchOptions) {
           type: 'transfer_in' as EntryType,
           amount: input.amount,
           is_personal_expense: false,
-          note: input.note || null,
+          note: input.description || null,
         },
       ])
 
@@ -217,7 +221,7 @@ export function useTransactions(options?: FetchOptions) {
 
     const { error: groupError } = await supabase
       .from('transaction_groups')
-      .update({ description: input.note || null, date: input.date, updated_at: new Date().toISOString() })
+      .update({ description: input.name || null, date: input.date, updated_at: new Date().toISOString() })
       .eq('id', groupId)
 
     if (groupError) return { error: groupError }
@@ -229,7 +233,8 @@ export function useTransactions(options?: FetchOptions) {
         category_id: input.categoryId,
         type: input.type as EntryType,
         amount: input.amount,
-        note: input.note || null,
+        funding_account_id: input.fundingAccountId || null,
+        note: input.description || null,
       })
       .eq('group_id', groupId)
       .eq('user_id', user.id)
@@ -243,14 +248,14 @@ export function useTransactions(options?: FetchOptions) {
 
     const { error: groupError } = await supabase
       .from('transaction_groups')
-      .update({ description: input.note || null, date: input.date, updated_at: new Date().toISOString() })
+      .update({ description: input.name || null, date: input.date, updated_at: new Date().toISOString() })
       .eq('id', groupId)
 
     if (groupError) return { error: groupError }
 
     const { error: outError } = await supabase
       .from('transaction_entries')
-      .update({ account_id: input.fromAccountId, amount: input.amount, note: input.note || null })
+      .update({ account_id: input.fromAccountId, amount: input.amount, note: input.description || null })
       .eq('group_id', groupId)
       .eq('type', 'transfer_out')
 
@@ -258,7 +263,7 @@ export function useTransactions(options?: FetchOptions) {
 
     const { error: inError } = await supabase
       .from('transaction_entries')
-      .update({ account_id: input.toAccountId, amount: input.amount, note: input.note || null })
+      .update({ account_id: input.toAccountId, amount: input.amount, note: input.description || null })
       .eq('group_id', groupId)
       .eq('type', 'transfer_in')
 

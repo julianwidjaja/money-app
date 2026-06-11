@@ -52,6 +52,7 @@ export interface TransactionEntry {
   amount: number
   personal_amount: number | null
   is_personal_expense: boolean
+  funding_account_id: string | null
   note: string | null
   created_at: string
 }

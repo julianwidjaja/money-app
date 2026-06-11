@@ -30,7 +30,7 @@ export function EditTransactionPage() {
 
       const { data: entries } = await supabase
         .from('transaction_entries')
-        .select('*, account:accounts(*), category:categories(*)')
+        .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
         .eq('group_id', id)
 
       setTx({
@@ -64,7 +64,9 @@ export function EditTransactionPage() {
       accountId: mainEntry.account_id,
       categoryId: mainEntry.category_id || '',
       date: tx.date,
-      note: mainEntry.note || '',
+      name: tx.description || '',
+      description: mainEntry.note || '',
+      fundingAccountId: mainEntry.funding_account_id || undefined,
     }
 
     return (
@@ -92,7 +94,8 @@ export function EditTransactionPage() {
       fromAccountId: outEntry.account_id,
       toAccountId: inEntry.account_id,
       date: tx.date,
-      note: outEntry.note || '',
+      name: tx.description || '',
+      description: outEntry.note || '',
     }
 
     return (
@@ -116,7 +119,9 @@ export function EditTransactionPage() {
       accountId: expenseEntry.account_id,
       categoryId: expenseEntry.category_id || '',
       date: tx.date,
-      note: tx.description || '',
+      name: tx.description || '',
+      description: expenseEntry.note || '',
+      fundingAccountId: expenseEntry.funding_account_id || undefined,
       isSplit: true,
       reimbursements: reimbursementEntries.map(r => ({
         id: r.id,

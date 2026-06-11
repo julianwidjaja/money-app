@@ -3,6 +3,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useRecurring } from '@/hooks/useRecurring'
+import { useSettings } from '@/hooks/useSettings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +16,8 @@ import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { getCategoryIcon } from '@/lib/icons'
-import { Plus, Trash2, Users, Repeat } from 'lucide-react'
+import { Plus, Trash2, Users, Repeat, ArrowRightLeft } from 'lucide-react'
+import { NameInput } from '@/components/common/NameInput'
 import type { RecurrenceFrequency, EntryType } from '@/types'
 
 interface Reimbursement {
@@ -31,32 +33,62 @@ export interface SimpleEditData {
   accountId: string
   categoryId: string
   date: string
-  note: string
+  name: string
+  description: string
+  fundingAccountId?: string
   isSplit?: boolean
   reimbursements?: Reimbursement[]
+}
+
+interface SharedFormState {
+  amount: number
+  date: string
+  name: string
+  description: string
+  accountId: string
 }
 
 interface TransactionFormProps {
   type: 'income' | 'expense'
   onSuccess: () => void
   editData?: SimpleEditData
+  shared?: SharedFormState
+  onSharedChange?: (updates: Partial<SharedFormState>) => void
 }
 
-export function TransactionForm({ type, onSuccess, editData }: TransactionFormProps) {
+export function TransactionForm({ type, onSuccess, editData, shared, onSharedChange }: TransactionFormProps) {
   const { accounts } = useAccounts()
   const { expenseCategories, incomeCategories } = useCategories()
   const { createSimpleTransaction, updateSimpleTransaction, createSplitTransaction, updateSplitTransaction } = useTransactions()
   const { createRule } = useRecurring()
+  const { isFeatureEnabled } = useSettings()
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories
   const isEdit = !!editData
+  const hasShared = !!shared
 
-  const [amount, setAmount] = useState(editData?.amount ?? 0)
-  const [accountId, setAccountId] = useState(editData?.accountId ?? '')
+  const [_amount, _setAmount] = useState(editData?.amount ?? 0)
+  const [_accountId, _setAccountId] = useState(editData?.accountId ?? '')
+  const [_date, _setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [_name, _setName] = useState(editData?.name ?? '')
+  const [_description, _setDescription] = useState(editData?.description ?? '')
+
+  const amount = hasShared ? shared.amount : _amount
+  const accountId = hasShared ? shared.accountId : _accountId
+  const date = hasShared ? shared.date : _date
+  const name = hasShared ? shared.name : _name
+  const description = hasShared ? shared.description : _description
+
+  function setAmount(v: number) { hasShared ? onSharedChange?.({ amount: v }) : _setAmount(v) }
+  function setAccountId(v: string) { hasShared ? onSharedChange?.({ accountId: v }) : _setAccountId(v) }
+  function setDate(v: string) { hasShared ? onSharedChange?.({ date: v }) : _setDate(v) }
+  function setName(v: string) { hasShared ? onSharedChange?.({ name: v }) : _setName(v) }
+  function setDescription(v: string) { hasShared ? onSharedChange?.({ description: v }) : _setDescription(v) }
+
   const [categoryId, setCategoryId] = useState(editData?.categoryId ?? '')
-  const [date, setDate] = useState(editData?.date ?? format(new Date(), 'yyyy-MM-dd'))
-  const [note, setNote] = useState(editData?.note ?? '')
   const [loading, setLoading] = useState(false)
+
+  const [fundingAccountId, setFundingAccountId] = useState(editData?.fundingAccountId ?? '')
 
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
@@ -110,7 +142,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
         accountId,
         categoryId,
         date,
-        description: note || 'Split transaction',
+        description: name || 'Split transaction',
         reimbursements: validReimbursements.map(r => ({
           friendName: r.friendName,
           amount: r.amount,
@@ -125,7 +157,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       if (result?.error) toast.error('Failed to save transaction')
       else {
         if (isRecurring && !isEdit) {
-          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
+          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
         }
         toast.success(isEdit ? 'Transaction updated' : 'Expense added')
         onSuccess()
@@ -134,7 +166,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
     }
 
     setLoading(true)
-    const input = { type, amount, accountId, categoryId, date, note: note || undefined }
+    const input = { type, amount, accountId, categoryId, date, name: name || undefined, description: description || undefined, fundingAccountId: fundingAccountId || undefined }
     const result = isEdit
       ? await updateSimpleTransaction(editData!.groupId, input)
       : await createSimpleTransaction(input)
@@ -144,7 +176,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       toast.error('Failed to save transaction')
     } else {
       if (isRecurring && !isEdit) {
-        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: note || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
+        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
       }
       toast.success(isEdit ? 'Transaction updated' : `${type === 'expense' ? 'Expense' : 'Income'} added`)
       onSuccess()
@@ -192,16 +224,66 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
 
       <div className="space-y-1.5">
         <Label>Date</Label>
-        <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-sm" />
       </div>
 
       <div className="space-y-1.5">
-        <Label>Note (optional)</Label>
-        <Input placeholder="Add a note..." value={note} onChange={e => setNote(e.target.value)} />
+        <Label>Name (optional)</Label>
+        <NameInput value={name} onChange={setName} />
       </div>
 
+      <div className="space-y-1.5">
+        <Label>Description (optional)</Label>
+        <textarea
+          className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none min-h-[60px] resize-y dark:bg-input/30"
+          placeholder="Add more details..."
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+      </div>
+
+      {/* Fund from different account — only for expenses */}
+      {type === 'expense' && isFeatureEnabled('feature_funding') && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setFundingAccountId(fundingAccountId ? '' : accounts[0]?.id || '')}
+            className={`flex items-center gap-2 w-full px-4 py-3 rounded-lg border text-sm transition-colors ${
+              fundingAccountId
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-primary/50'
+            }`}
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+            <span className="flex-1 text-left">Fund from different account</span>
+            <div className={`w-9 h-5 rounded-full transition-colors ${fundingAccountId ? 'bg-primary' : 'bg-muted'}`}>
+              <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${fundingAccountId ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {fundingAccountId && (
+            <div className="space-y-1.5">
+              <Label>Funding Account</Label>
+              <Select
+                value={fundingAccountId}
+                onValueChange={(v) => v != null && setFundingAccountId(v)}
+                items={accounts.filter(a => a.id !== accountId).map(a => ({ value: a.id, label: a.name }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.filter(a => a.id !== accountId).map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">This amount will show in your CC payment reminder</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Recurring toggle */}
-      {!isEdit && (
+      {!isEdit && isFeatureEnabled('feature_recurring') && (
         <>
           <button
             type="button"
@@ -236,7 +318,7 @@ export function TransactionForm({ type, onSuccess, editData }: TransactionFormPr
       )}
 
       {/* Split toggle — only for expenses */}
-      {type === 'expense' && (
+      {type === 'expense' && isFeatureEnabled('feature_split') && (
         <button
           type="button"
           onClick={() => setIsSplit(!isSplit)}

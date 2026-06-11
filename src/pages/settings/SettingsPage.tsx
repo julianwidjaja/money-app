@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Tags, Repeat, Download, Moon, Sun, LogOut, Wallet, ChevronRight, MessageSquare, Trash2 } from 'lucide-react'
+import { Tags, Repeat, Download, Moon, Sun, LogOut, Wallet, ChevronRight, MessageSquare, Trash2, ToggleRight, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 
 const menuItems = [
@@ -17,6 +17,8 @@ const menuItems = [
   { to: '/settings/recurring', icon: Repeat, label: 'Recurring Transactions' },
   { to: '/budgets', icon: Wallet, label: 'Budgets' },
   { to: '/settings/export', icon: Download, label: 'Export Data' },
+  { to: '/settings/reminders', icon: Bell, label: 'Reminders' },
+  { to: '/settings/features', icon: ToggleRight, label: 'Features' },
   { to: '/settings/feedback', icon: MessageSquare, label: 'Report Bug / Feedback' },
 ]
 
