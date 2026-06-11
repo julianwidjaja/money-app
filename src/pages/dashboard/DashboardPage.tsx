@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
-import { useAccountBalances } from '@/hooks/useAccounts'
+import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useRecurring } from '@/hooks/useRecurring'
@@ -16,7 +16,8 @@ import { Wallet, ArrowRight, TrendingDown } from 'lucide-react'
 import { getCategoryIcon } from '@/lib/icons'
 
 export function DashboardPage() {
-  const { balances, loading: balancesLoading } = useAccountBalances()
+  const { accounts } = useAccounts()
+  const { balances, loading: balancesLoading } = useAccountBalances(accounts.map(a => a.id))
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
   const { budgetStatus } = useBudgets()
   const { generatePendingTransactions } = useRecurring()

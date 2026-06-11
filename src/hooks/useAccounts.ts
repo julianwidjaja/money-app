@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { ACCOUNT_TYPE_ORDER } from '@/lib/constants'
 import type { Account, AccountBalance } from '@/types'
 
 export function useAccounts() {
@@ -67,10 +66,20 @@ export function useAccounts() {
     return { error: null }
   }
 
-  return { accounts, loading, createAccount, updateAccount, deleteAccount, refetch: fetchAccounts }
+  async function reorderAccounts(reordered: Account[]) {
+    setAccounts(reordered)
+    for (let i = 0; i < reordered.length; i++) {
+      await supabase
+        .from('accounts')
+        .update({ sort_order: i })
+        .eq('id', reordered[i].id)
+    }
+  }
+
+  return { accounts, loading, createAccount, updateAccount, deleteAccount, reorderAccounts, refetch: fetchAccounts }
 }
 
-export function useAccountBalances() {
+export function useAccountBalances(accountOrder?: string[]) {
   const { user } = useAuth()
   const [balances, setBalances] = useState<AccountBalance[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,18 +90,22 @@ export function useAccountBalances() {
       .from('account_balances')
       .select('*')
       .eq('user_id', user.id)
-    if (!error && data) {
-      const sorted = (data as AccountBalance[]).sort((a, b) => {
-        const ai = ACCOUNT_TYPE_ORDER.indexOf(a.type)
-        const bi = ACCOUNT_TYPE_ORDER.indexOf(b.type)
-        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
-      })
-      setBalances(sorted)
-    }
+    if (!error && data) setBalances(data as AccountBalance[])
     setLoading(false)
   }, [user])
 
   useEffect(() => { fetchBalances() }, [fetchBalances])
 
-  return { balances, loading, refetch: fetchBalances }
+  const sortedBalances = useMemo(() => {
+    if (!accountOrder || accountOrder.length === 0) return balances
+    const orderMap = new Map<string, number>()
+    accountOrder.forEach((id, i) => orderMap.set(id, i))
+    return [...balances].sort((a, b) => {
+      const ai = orderMap.get(a.account_id) ?? 999
+      const bi = orderMap.get(b.account_id) ?? 999
+      return ai - bi
+    })
+  }, [balances, accountOrder])
+
+  return { balances: sortedBalances, loading, refetch: fetchBalances }
 }

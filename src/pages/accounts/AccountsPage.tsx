@@ -17,15 +17,69 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { formatCurrency, getYearMonth } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
-import { Wallet, Plus, Pencil, Trash2, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Wallet, Plus, Pencil, Trash2, BarChart3, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { toast } from 'sonner'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns'
-import type { AccountType } from '@/types'
+import type { Account, AccountType, AccountBalance } from '@/types'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+function SortableAccountItem({
+  balance, onEdit, onDelete,
+}: {
+  balance: AccountBalance
+  onEdit: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: balance.account_id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.8 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={isDragging ? 'shadow-lg' : 'hover:bg-accent/50 transition-colors'}>
+        <CardContent className="flex items-center gap-2 py-4 px-4">
+          <button
+            className="cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 text-muted-foreground hover:text-foreground"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <Link to={`/accounts/${balance.account_id}`} className="flex-1 min-w-0 no-underline">
+            <p className="font-medium text-foreground">{balance.name}</p>
+            <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[balance.type]}</p>
+          </Link>
+          <div className="flex items-center gap-2">
+            <CurrencyDisplay cents={balance.current_balance} type={balance.current_balance < 0 ? 'expense' : 'neutral'} showSign={balance.current_balance < 0} />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(balance.account_id)}>
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(balance.account_id)}>
+              <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 export function AccountsPage() {
-  const { accounts, createAccount, updateAccount, deleteAccount } = useAccounts()
-  const { balances, loading, refetch } = useAccountBalances()
+  const { accounts, createAccount, updateAccount, deleteAccount, reorderAccounts } = useAccounts()
+  const { balances, loading, refetch } = useAccountBalances(accounts.map(a => a.id))
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
@@ -40,7 +94,6 @@ export function AccountsPage() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  // Reports state
   const [reportDate, setReportDate] = useState(new Date())
   const reportStart = format(startOfMonth(reportDate), 'yyyy-MM-dd')
   const reportEnd = format(endOfMonth(reportDate), 'yyyy-MM-dd')
@@ -53,6 +106,12 @@ export function AccountsPage() {
   )
 
   const totalBalance = balances.reduce((sum, b) => sum + b.current_balance, 0)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -92,6 +151,16 @@ export function AccountsPage() {
     const { error } = await deleteAccount(accountId)
     if (error) { toast.error('Failed to delete account. It may have transactions.') }
     else { toast.success('Account removed'); setDeleteConfirmId(null); refetch() }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = accounts.findIndex(a => a.id === active.id)
+    const newIndex = accounts.findIndex(a => a.id === over.id)
+    const reordered = arrayMove(accounts, oldIndex, newIndex).map((a, i) => ({ ...a, sort_order: i }))
+    reorderAccounts(reordered)
   }
 
   return (
@@ -155,27 +224,20 @@ export function AccountsPage() {
           ) : balances.length === 0 ? (
             <EmptyState icon={Wallet} title="No accounts yet" description="Add your bank accounts, credit cards, and cash to start tracking" />
           ) : (
-            <div className="space-y-2">
-              {balances.map(b => (
-                <Card key={b.account_id} className="hover:bg-accent/50 transition-colors">
-                  <CardContent className="flex items-center justify-between py-4 px-4">
-                    <Link to={`/accounts/${b.account_id}`} className="flex-1 min-w-0 no-underline">
-                      <p className="font-medium text-foreground">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[b.type]}</p>
-                    </Link>
-                    <div className="flex items-center gap-2">
-                      <CurrencyDisplay cents={b.current_balance} type={b.current_balance < 0 ? 'expense' : 'neutral'} showSign={b.current_balance < 0} />
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(b.account_id)}>
-                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteConfirmId(b.account_id)}>
-                        <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={balances.map(b => b.account_id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {balances.map(b => (
+                    <SortableAccountItem
+                      key={b.account_id}
+                      balance={b}
+                      onEdit={openEdit}
+                      onDelete={(id) => setDeleteConfirmId(id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </TabsContent>
 
@@ -223,7 +285,7 @@ export function AccountsPage() {
                   const pct = totalSpending > 0 ? Math.round((s.personal_total / totalSpending) * 100) : 0
                   return (
                     <div key={s.category_id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: s.color + '20' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: s.color + '20' }}>
                         <Icon className="w-4 h-4" style={{ color: s.color }} />
                       </div>
                       <div className="flex-1">
