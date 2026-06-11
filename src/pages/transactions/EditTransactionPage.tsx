@@ -30,7 +30,7 @@ export function EditTransactionPage() {
 
       const { data: entries } = await supabase
         .from('transaction_entries')
-        .select('*, account:accounts(*), category:categories(*)')
+        .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
         .eq('group_id', id)
 
       setTx({

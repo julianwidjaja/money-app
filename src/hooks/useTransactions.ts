@@ -71,7 +71,7 @@ export function useTransactions(options?: FetchOptions) {
     const groupIds = groups.map((g: any) => g.id)
     let entriesQuery = supabase
       .from('transaction_entries')
-      .select('*, account:accounts(*), category:categories(*)')
+      .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
       .in('group_id', groupIds)
 
     if (options?.accountId) entriesQuery = entriesQuery.eq('account_id', options.accountId)
