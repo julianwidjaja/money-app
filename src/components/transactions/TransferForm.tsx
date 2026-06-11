@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useRecurring } from '@/hooks/useRecurring'
+import { useSettings } from '@/hooks/useSettings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,6 +44,7 @@ export function TransferForm({ onSuccess, editData, shared, onSharedChange }: Tr
   const { accounts } = useAccounts()
   const { createTransfer, updateTransfer } = useTransactions()
   const { createRule } = useRecurring()
+  const { isFeatureEnabled } = useSettings()
   const isEdit = !!editData
   const hasShared = !!shared
 
@@ -151,7 +153,7 @@ export function TransferForm({ onSuccess, editData, shared, onSharedChange }: Tr
       </div>
 
       {/* Recurring toggle */}
-      {!isEdit && (
+      {!isEdit && isFeatureEnabled('feature_recurring') && (
         <>
           <button
             type="button"

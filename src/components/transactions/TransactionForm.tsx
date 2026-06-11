@@ -3,6 +3,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useRecurring } from '@/hooks/useRecurring'
+import { useSettings } from '@/hooks/useSettings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +60,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
   const { expenseCategories, incomeCategories } = useCategories()
   const { createSimpleTransaction, updateSimpleTransaction, createSplitTransaction, updateSplitTransaction } = useTransactions()
   const { createRule } = useRecurring()
+  const { isFeatureEnabled } = useSettings()
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories
   const isEdit = !!editData
@@ -238,7 +240,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
       </div>
 
       {/* Recurring toggle */}
-      {!isEdit && (
+      {!isEdit && isFeatureEnabled('feature_recurring') && (
         <>
           <button
             type="button"
@@ -273,7 +275,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
       )}
 
       {/* Split toggle — only for expenses */}
-      {type === 'expense' && (
+      {type === 'expense' && isFeatureEnabled('feature_split') && (
         <button
           type="button"
           onClick={() => setIsSplit(!isSplit)}
