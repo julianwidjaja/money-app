@@ -185,7 +185,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-3">
             {transactions.map(tx => {
               const mainEntry = tx.entries.find(e => e.type === 'expense' || e.type === 'income') || tx.entries[0]
               if (!mainEntry) return null
@@ -195,7 +195,7 @@ export function DashboardPage() {
               const Icon = getCategoryIcon(cat?.icon)
 
               return (
-                <Link key={tx.id} to={`/transactions/${tx.id}`}>
+                <Link key={tx.id} to={`/transactions/${tx.id}`} className="block">
                   <Card className="hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center gap-3 py-3 px-4">
                       <div
