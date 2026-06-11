@@ -21,6 +21,7 @@ import { RecurringSettingsPage } from '@/pages/settings/RecurringSettingsPage'
 import { ExportPage } from '@/pages/settings/ExportPage'
 import { FeedbackPage } from '@/pages/settings/FeedbackPage'
 import { FeaturesPage } from '@/pages/settings/FeaturesPage'
+import { RemindersPage } from '@/pages/settings/RemindersPage'
 import type { ReactNode } from 'react'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="settings/export" element={<ExportPage />} />
               <Route path="settings/feedback" element={<FeedbackPage />} />
               <Route path="settings/features" element={<FeaturesPage />} />
+              <Route path="settings/reminders" element={<RemindersPage />} />
             </Route>
           </Routes>
           <Toaster />

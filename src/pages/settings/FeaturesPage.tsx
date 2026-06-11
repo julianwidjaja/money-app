@@ -1,6 +1,6 @@
 import { useSettings } from '@/hooks/useSettings'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Repeat } from 'lucide-react'
+import { Users, Repeat, Bell } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface FeatureToggle {
@@ -22,6 +22,12 @@ const features: FeatureToggle[] = [
     icon: Repeat,
     name: 'Recurring transactions',
     description: 'Set transactions to repeat automatically on a schedule',
+  },
+  {
+    key: 'feature_reminders',
+    icon: Bell,
+    name: 'Payment reminders',
+    description: 'Get reminded on your Dashboard when payments are due',
   },
 ]
 

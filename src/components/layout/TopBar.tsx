@@ -25,6 +25,7 @@ const pageTitles: Record<string, string> = {
   '/settings/recurring': 'Recurring',
   '/settings/export': 'Export',
   '/settings/features': 'Features',
+  '/settings/reminders': 'Reminders',
   '/settings/feedback': 'Feedback',
 }
 

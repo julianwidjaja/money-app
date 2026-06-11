@@ -5,6 +5,9 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useRecurring } from '@/hooks/useRecurring'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
+import { useReminders } from '@/hooks/useReminders'
+import { useSettings } from '@/hooks/useSettings'
+import { ReminderBanner } from '@/components/dashboard/ReminderBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -21,6 +24,10 @@ export function DashboardPage() {
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
   const { budgetStatus } = useBudgets()
   const { generatePendingTransactions } = useRecurring()
+  const { dueReminders, dismissReminder } = useReminders()
+  const { isFeatureEnabled } = useSettings()
+
+  const accountNameMap = new Map(balances.map(b => [b.account_id, b.name]))
 
   const now = new Date()
   const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -36,6 +43,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 py-4">
+      {/* Reminder Banner */}
+      {isFeatureEnabled('feature_reminders') && dueReminders.length > 0 && (
+        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} onDismiss={dismissReminder} />
+      )}
+
       {/* Net Balance */}
       <Card>
         <CardContent className="pt-6 text-center">
