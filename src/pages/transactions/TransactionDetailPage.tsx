@@ -73,7 +73,7 @@ export function TransactionDetailPage() {
 
   return (
     <div className="space-y-4 py-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+      <Button variant="ghost" size="sm" onClick={() => navigate('/transactions')}>
         <ArrowLeft className="w-4 h-4 mr-1" /> Back
       </Button>
 
