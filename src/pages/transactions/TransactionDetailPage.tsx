@@ -36,7 +36,7 @@ export function TransactionDetailPage() {
 
       const { data: entries } = await supabase
         .from('transaction_entries')
-        .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*)')
+        .select('*, account:accounts!transaction_entries_account_id_fkey(*), category:categories(*), funding_account:accounts!transaction_entries_funding_account_id_fkey(name)')
         .eq('group_id', id)
 
       setTx({
@@ -128,7 +128,9 @@ export function TransactionDetailPage() {
             )}
             {(mainEntry as any)?.funding_account?.name && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Funded by</span>
+                <span className="text-muted-foreground">
+                  {mainEntry.type === 'income' ? 'Originally at' : 'Funded by'}
+                </span>
                 <span>{(mainEntry as any).funding_account.name}</span>
               </div>
             )}
