@@ -242,8 +242,8 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
         />
       </div>
 
-      {/* Fund from different account — only for expenses */}
-      {type === 'expense' && isFeatureEnabled('feature_funding') && (
+      {/* Fund from different account */}
+      {isFeatureEnabled('feature_funding') && (
         <div className="space-y-2">
           <button
             type="button"
