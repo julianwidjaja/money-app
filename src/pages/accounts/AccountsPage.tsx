@@ -18,7 +18,7 @@ import { formatCurrency, getYearMonth } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
 import { Wallet, Plus, Pencil, Trash2, BarChart3, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { toast } from 'sonner'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import type { Account, AccountType, AccountBalance } from '@/types'
@@ -268,14 +268,13 @@ export function AccountsPage() {
             <EmptyState icon={BarChart3} title="No spending data" description="Add some expenses to see your spending breakdown" />
           ) : (
             <>
-              <div className="h-56 w-full">
+              <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2} dataKey="value">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip formatter={(value) => formatCurrency(Number(value) * 100)} />
-                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
