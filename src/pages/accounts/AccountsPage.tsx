@@ -99,11 +99,26 @@ export function AccountsPage() {
   const reportEnd = format(endOfMonth(reportDate), 'yyyy-MM-dd')
   const { spending, loading: spendingLoading } = useCategorySpending(reportStart, reportEnd)
   const { budgetStatus } = useBudgets(getYearMonth(reportDate))
-  const totalSpending = spending.reduce((sum, s) => sum + s.personal_total, 0)
-  const pieData = useMemo(() =>
-    spending.map(s => ({ name: s.name, value: s.personal_total / 100, color: s.color })),
-    [spending]
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set())
+
+  const filteredSpending = useMemo(() =>
+    spending.filter(s => !excludedCategories.has(s.category_id)),
+    [spending, excludedCategories]
   )
+  const totalSpending = filteredSpending.reduce((sum, s) => sum + s.personal_total, 0)
+  const pieData = useMemo(() =>
+    filteredSpending.map(s => ({ name: s.name, value: s.personal_total / 100, color: s.color })),
+    [filteredSpending]
+  )
+
+  function toggleCategory(categoryId: string) {
+    setExcludedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(categoryId)) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
+  }
 
   const totalBalance = balances.reduce((sum, b) => sum + b.current_balance, 0)
 
@@ -278,21 +293,34 @@ export function AccountsPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-2 mt-4">
+              <div className="flex items-center justify-between mt-4 mb-2">
+                <p className="text-sm font-medium">Total: <CurrencyDisplay cents={totalSpending} type="expense" showSign={false} className="inline text-sm font-medium" /></p>
+                {excludedCategories.size > 0 && (
+                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setExcludedCategories(new Set())}>
+                    Show all
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2">
                 {spending.map(s => {
                   const Icon = getCategoryIcon(s.icon)
-                  const pct = totalSpending > 0 ? Math.round((s.personal_total / totalSpending) * 100) : 0
+                  const isExcluded = excludedCategories.has(s.category_id)
+                  const pct = !isExcluded && totalSpending > 0 ? Math.round((s.personal_total / totalSpending) * 100) : 0
                   return (
-                    <div key={s.category_id} className="flex items-center gap-3">
+                    <div
+                      key={s.category_id}
+                      className={`flex items-center gap-3 cursor-pointer rounded-lg p-1.5 -mx-1.5 transition-colors hover:bg-accent/50 ${isExcluded ? 'opacity-40' : ''}`}
+                      onClick={() => toggleCategory(s.category_id)}
+                    >
                       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: s.color + '20' }}>
                         <Icon className="w-4 h-4" style={{ color: s.color }} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <span className="text-sm">{s.name}</span>
-                          <span className="text-xs text-muted-foreground">{pct}%</span>
+                          <span className="text-xs text-muted-foreground">{isExcluded ? 'off' : `${pct}%`}</span>
                         </div>
-                        <Progress value={pct} className="h-1.5 mt-1" />
+                        {!isExcluded && <Progress value={pct} className="h-1.5 mt-1" />}
                       </div>
                       <CurrencyDisplay cents={s.personal_total} type="expense" showSign={false} className="text-sm w-20 text-right" />
                     </div>
