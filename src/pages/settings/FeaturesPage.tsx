@@ -1,6 +1,6 @@
 import { useSettings } from '@/hooks/useSettings'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Repeat, Bell, ArrowRightLeft } from 'lucide-react'
+import { Users, Repeat, Bell, ArrowRightLeft, Layers } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface FeatureToggle {
@@ -34,6 +34,12 @@ const features: FeatureToggle[] = [
     icon: Bell,
     name: 'Payment reminders',
     description: 'Get reminded on your Dashboard when payments are due',
+  },
+  {
+    key: 'feature_multi_transfer',
+    icon: Layers,
+    name: 'Multi-account transfers',
+    description: 'Transfer between multiple source and destination accounts at once',
   },
 ]
 

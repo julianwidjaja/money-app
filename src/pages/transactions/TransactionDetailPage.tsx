@@ -156,21 +156,48 @@ export function TransactionDetailPage() {
             </>
           )}
 
-          {tx.type === 'transfer' && tx.entries.length >= 2 && (
-            <>
-              <Separator />
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">From</span>
-                  <span>{tx.entries.find(e => e.type === 'transfer_out')?.account?.name}</span>
+          {tx.type === 'transfer' && tx.entries.length >= 2 && (() => {
+            const outEntries = tx.entries.filter(e => e.type === 'transfer_out')
+            const inEntries = tx.entries.filter(e => e.type === 'transfer_in')
+            const isMulti = outEntries.length > 1 || inEntries.length > 1
+
+            return (
+              <>
+                <Separator />
+                <div className="space-y-2 text-sm">
+                  {isMulti ? (
+                    <>
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">From</h3>
+                      {outEntries.map(e => (
+                        <div key={e.id} className="flex justify-between">
+                          <span>{e.account?.name}</span>
+                          <CurrencyDisplay cents={e.amount} type="neutral" showSign={false} />
+                        </div>
+                      ))}
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">To</h3>
+                      {inEntries.map(e => (
+                        <div key={e.id} className="flex justify-between">
+                          <span>{e.account?.name}</span>
+                          <CurrencyDisplay cents={e.amount} type="neutral" showSign={false} />
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">From</span>
+                        <span>{outEntries[0]?.account?.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">To</span>
+                        <span>{inEntries[0]?.account?.name}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">To</span>
-                  <span>{tx.entries.find(e => e.type === 'transfer_in')?.account?.name}</span>
-                </div>
-              </div>
-            </>
-          )}
+              </>
+            )
+          })()}
 
           <Separator />
 

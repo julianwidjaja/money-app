@@ -110,7 +110,9 @@ export function TransactionsPage() {
                                 {tx.description || cat?.name || (isTransfer ? 'Transfer' : 'Transaction')}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {mainEntry.account?.name}
+                                {isTransfer && (tx.entries.filter(e => e.type === 'transfer_out').length > 1 || tx.entries.filter(e => e.type === 'transfer_in').length > 1)
+                                  ? `${tx.entries.filter(e => e.type === 'transfer_out').length} → ${tx.entries.filter(e => e.type === 'transfer_in').length} accounts`
+                                  : mainEntry.account?.name}
                                 {tx.type === 'split' && ` · Split (${formatCurrency(displayAmount)} yours)`}
                               </p>
                             </div>
@@ -121,7 +123,7 @@ export function TransactionsPage() {
                               />
                             )}
                             {isTransfer && (
-                              <CurrencyDisplay cents={mainEntry.amount} type="neutral" showSign={false} />
+                              <CurrencyDisplay cents={tx.entries.filter(e => e.type === 'transfer_out').reduce((s, e) => s + e.amount, 0)} type="neutral" showSign={false} />
                             )}
                           </CardContent>
                         </Card>

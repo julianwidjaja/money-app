@@ -84,18 +84,25 @@ export function EditTransactionPage() {
   }
 
   if (tx.type === 'transfer') {
-    const outEntry = tx.entries.find(e => e.type === 'transfer_out')
-    const inEntry = tx.entries.find(e => e.type === 'transfer_in')
-    if (!outEntry || !inEntry) return <div className="py-12 text-center text-muted-foreground">Invalid transfer</div>
+    const outEntries = tx.entries.filter(e => e.type === 'transfer_out')
+    const inEntries = tx.entries.filter(e => e.type === 'transfer_in')
+    if (outEntries.length === 0 || inEntries.length === 0) return <div className="py-12 text-center text-muted-foreground">Invalid transfer</div>
 
     const editData: TransferEditData = {
       groupId: tx.id,
-      amount: outEntry.amount,
-      fromAccountId: outEntry.account_id,
-      toAccountId: inEntry.account_id,
+      sources: outEntries.map(e => ({
+        id: e.id,
+        accountId: e.account_id,
+        amount: e.amount,
+      })),
+      destinations: inEntries.map(e => ({
+        id: e.id,
+        accountId: e.account_id,
+        amount: e.amount,
+      })),
       date: tx.date,
       name: tx.description || '',
-      description: outEntry.note || '',
+      description: outEntries[0].note || '',
     }
 
     return (
