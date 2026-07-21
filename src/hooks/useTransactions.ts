@@ -14,10 +14,14 @@ interface CreateSimpleTransactionInput {
   fundingAccountId?: string
 }
 
-interface CreateTransferInput {
+interface TransferSource {
+  accountId: string
   amount: number
-  fromAccountId: string
-  toAccountId: string
+}
+
+interface CreateTransferInput {
+  sources: TransferSource[]
+  destinations: TransferSource[]
   date: string
   name?: string
   description?: string
@@ -151,28 +155,30 @@ export function useTransactions(options?: FetchOptions) {
 
     if (groupError || !group) return { error: groupError }
 
+    const entries = [
+      ...input.sources.map(src => ({
+        group_id: group.id,
+        user_id: user.id,
+        account_id: src.accountId,
+        type: 'transfer_out' as EntryType,
+        amount: src.amount,
+        is_personal_expense: false,
+        note: input.description || null,
+      })),
+      ...input.destinations.map(dst => ({
+        group_id: group.id,
+        user_id: user.id,
+        account_id: dst.accountId,
+        type: 'transfer_in' as EntryType,
+        amount: dst.amount,
+        is_personal_expense: false,
+        note: input.description || null,
+      })),
+    ]
+
     const { error: entryError } = await supabase
       .from('transaction_entries')
-      .insert([
-        {
-          group_id: group.id,
-          user_id: user.id,
-          account_id: input.fromAccountId,
-          type: 'transfer_out' as EntryType,
-          amount: input.amount,
-          is_personal_expense: false,
-          note: input.description || null,
-        },
-        {
-          group_id: group.id,
-          user_id: user.id,
-          account_id: input.toAccountId,
-          type: 'transfer_in' as EntryType,
-          amount: input.amount,
-          is_personal_expense: false,
-          note: input.description || null,
-        },
-      ])
+      .insert(entries)
 
     if (!entryError) await fetchTransactions()
     return { error: entryError }
@@ -253,22 +259,40 @@ export function useTransactions(options?: FetchOptions) {
 
     if (groupError) return { error: groupError }
 
-    const { error: outError } = await supabase
+    const { error: deleteError } = await supabase
       .from('transaction_entries')
-      .update({ account_id: input.fromAccountId, amount: input.amount, note: input.description || null })
+      .delete()
       .eq('group_id', groupId)
-      .eq('type', 'transfer_out')
 
-    if (outError) return { error: outError }
+    if (deleteError) return { error: deleteError }
 
-    const { error: inError } = await supabase
+    const entries = [
+      ...input.sources.map(src => ({
+        group_id: groupId,
+        user_id: user.id,
+        account_id: src.accountId,
+        type: 'transfer_out' as EntryType,
+        amount: src.amount,
+        is_personal_expense: false,
+        note: input.description || null,
+      })),
+      ...input.destinations.map(dst => ({
+        group_id: groupId,
+        user_id: user.id,
+        account_id: dst.accountId,
+        type: 'transfer_in' as EntryType,
+        amount: dst.amount,
+        is_personal_expense: false,
+        note: input.description || null,
+      })),
+    ]
+
+    const { error: insertError } = await supabase
       .from('transaction_entries')
-      .update({ account_id: input.toAccountId, amount: input.amount, note: input.description || null })
-      .eq('group_id', groupId)
-      .eq('type', 'transfer_in')
+      .insert(entries)
 
-    if (!inError) await fetchTransactions()
-    return { error: inError }
+    if (!insertError) await fetchTransactions()
+    return { error: insertError }
   }
 
   async function updateSplitTransaction(groupId: string, input: CreateSplitTransactionInput) {

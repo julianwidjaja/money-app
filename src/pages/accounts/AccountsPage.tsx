@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
 import { useBudgets } from '@/hooks/useBudgets'
@@ -18,7 +18,7 @@ import { formatCurrency, getYearMonth } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
 import { Wallet, Plus, Pencil, Trash2, BarChart3, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { toast } from 'sonner'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import type { Account, AccountType, AccountBalance } from '@/types'
@@ -78,6 +78,12 @@ function SortableAccountItem({
 }
 
 export function AccountsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') || 'accounts'
+  function setActiveTab(tab: string) {
+    setSearchParams({ tab }, { replace: true })
+  }
+
   const { accounts, createAccount, updateAccount, deleteAccount, reorderAccounts } = useAccounts()
   const { balances, loading, refetch } = useAccountBalances(accounts.map(a => a.id))
 
@@ -99,11 +105,26 @@ export function AccountsPage() {
   const reportEnd = format(endOfMonth(reportDate), 'yyyy-MM-dd')
   const { spending, loading: spendingLoading } = useCategorySpending(reportStart, reportEnd)
   const { budgetStatus } = useBudgets(getYearMonth(reportDate))
-  const totalSpending = spending.reduce((sum, s) => sum + s.personal_total, 0)
-  const pieData = useMemo(() =>
-    spending.map(s => ({ name: s.name, value: s.personal_total / 100, color: s.color })),
-    [spending]
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set())
+
+  const filteredSpending = useMemo(() =>
+    spending.filter(s => !excludedCategories.has(s.category_id)),
+    [spending, excludedCategories]
   )
+  const totalSpending = filteredSpending.reduce((sum, s) => sum + s.personal_total, 0)
+  const pieData = useMemo(() =>
+    filteredSpending.map(s => ({ name: s.name, value: s.personal_total / 100, color: s.color })),
+    [filteredSpending]
+  )
+
+  function toggleCategory(categoryId: string) {
+    setExcludedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(categoryId)) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
+  }
 
   const totalBalance = balances.reduce((sum, b) => sum + b.current_balance, 0)
 
@@ -172,7 +193,7 @@ export function AccountsPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="accounts">
+      <Tabs value={activeTab} onValueChange={(v) => v != null && setActiveTab(v)}>
         <TabsList className="w-full">
           <TabsTrigger value="accounts" className="flex-1">Accounts</TabsTrigger>
           <TabsTrigger value="spending" className="flex-1">Spending</TabsTrigger>
@@ -268,33 +289,51 @@ export function AccountsPage() {
             <EmptyState icon={BarChart3} title="No spending data" description="Add some expenses to see your spending breakdown" />
           ) : (
             <>
-              <div className="h-56 w-full">
+              <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2} dataKey="value">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip formatter={(value) => formatCurrency(Number(value) * 100)} />
-                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-2 mt-4">
+              <div className="flex items-center justify-between mt-4 mb-2">
+                <p className="text-sm font-medium">Total: <CurrencyDisplay cents={totalSpending} type="expense" showSign={false} className="inline text-sm font-medium" /></p>
+                {excludedCategories.size > 0 && (
+                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setExcludedCategories(new Set())}>
+                    Show all
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2">
                 {spending.map(s => {
                   const Icon = getCategoryIcon(s.icon)
-                  const pct = totalSpending > 0 ? Math.round((s.personal_total / totalSpending) * 100) : 0
+                  const isExcluded = excludedCategories.has(s.category_id)
+                  const pct = !isExcluded && totalSpending > 0 ? Math.round((s.personal_total / totalSpending) * 100) : 0
                   return (
-                    <div key={s.category_id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: s.color + '20' }}>
+                    <div
+                      key={s.category_id}
+                      className={`flex items-center gap-3 rounded-lg p-1.5 -mx-1.5 transition-colors ${isExcluded ? 'opacity-40' : ''}`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                        style={{ backgroundColor: s.color + '20' }}
+                        onClick={() => toggleCategory(s.category_id)}
+                      >
                         <Icon className="w-4 h-4" style={{ color: s.color }} />
                       </div>
-                      <div className="flex-1">
+                      <Link
+                        to={`/transactions?category=${s.category_id}&start=${reportStart}&end=${reportEnd}`}
+                        className="flex-1 hover:underline"
+                      >
                         <div className="flex items-center justify-between">
                           <span className="text-sm">{s.name}</span>
-                          <span className="text-xs text-muted-foreground">{pct}%</span>
+                          <span className="text-xs text-muted-foreground">{isExcluded ? 'off' : `${pct}%`}</span>
                         </div>
-                        <Progress value={pct} className="h-1.5 mt-1" />
-                      </div>
+                        {!isExcluded && <Progress value={pct} className="h-1.5 mt-1" />}
+                      </Link>
                       <CurrencyDisplay cents={s.personal_total} type="expense" showSign={false} className="text-sm w-20 text-right" />
                     </div>
                   )
