@@ -2,94 +2,134 @@ import { useState, useMemo } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAccounts } from '@/hooks/useAccounts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { getCategoryIcon } from '@/lib/icons'
-import { ListOrdered, ArrowLeftRight, X } from 'lucide-react'
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
+import { ListOrdered, ArrowLeftRight, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns'
 
-type Period = 'daily' | 'weekly' | 'monthly' | 'all'
+type TypeFilter = 'all' | 'expense' | 'income' | 'transfer'
 
 export function TransactionsPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const categoryFilter = searchParams.get('category')
+  const categoryParam = searchParams.get('category')
   const startFilter = searchParams.get('start')
   const endFilter = searchParams.get('end')
 
-  const [period, setPeriod] = useState<Period>(
-    startFilter && endFilter ? 'all' : 'monthly'
-  )
-  const now = new Date()
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (startFilter) return new Date(startFilter + 'T00:00:00')
+    return new Date()
+  })
 
-  const { categories } = useCategories()
-  const filterCategory = categoryFilter ? categories.find(c => c.id === categoryFilter) : null
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
+  const [selectedAccount, setSelectedAccount] = useState('')
+  const [selectedType, setSelectedType] = useState<TypeFilter>('all')
+
+  const { categories, expenseCategories, incomeCategories } = useCategories()
+  const { accounts } = useAccounts()
+
+  const activeCategoryId = categoryParam || selectedCategory || undefined
+  const filterCategory = activeCategoryId ? categories.find(c => c.id === activeCategoryId) : null
+  const allCategories = [...expenseCategories, ...incomeCategories]
 
   const dateRange = useMemo(() => {
     if (startFilter && endFilter) {
       return { startDate: startFilter, endDate: endFilter }
     }
-    switch (period) {
-      case 'daily':
-        const today = format(now, 'yyyy-MM-dd')
-        return { startDate: today, endDate: today }
-      case 'weekly':
-        return {
-          startDate: format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-          endDate: format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-        }
-      case 'monthly':
-        return {
-          startDate: format(startOfMonth(now), 'yyyy-MM-dd'),
-          endDate: format(endOfMonth(now), 'yyyy-MM-dd'),
-        }
-      case 'all':
-        return {}
+    return {
+      startDate: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
+      endDate: format(endOfMonth(currentDate), 'yyyy-MM-dd'),
     }
-  }, [period, startFilter, endFilter])
+  }, [currentDate, startFilter, endFilter])
 
   const fetchOptions = useMemo(() => ({
     ...dateRange,
-    ...(categoryFilter ? { categoryId: categoryFilter } : {}),
-  }), [dateRange, categoryFilter])
+    ...(activeCategoryId ? { categoryId: activeCategoryId } : {}),
+    ...(selectedAccount ? { accountId: selectedAccount } : {}),
+  }), [dateRange, activeCategoryId, selectedAccount])
 
   const { transactions, loading } = useTransactions(fetchOptions)
 
+  const filteredTransactions = useMemo(() => {
+    if (selectedType === 'all') return transactions
+    return transactions.filter(tx => {
+      if (selectedType === 'transfer') return tx.type === 'transfer'
+      if (selectedType === 'expense') return tx.type === 'simple' && tx.entries.some(e => e.type === 'expense') || tx.type === 'split'
+      if (selectedType === 'income') return tx.type === 'simple' && tx.entries.some(e => e.type === 'income')
+      return true
+    })
+  }, [transactions, selectedType])
+
   const groupedByDate = useMemo(() => {
-    const groups = new Map<string, typeof transactions>()
-    for (const tx of transactions) {
+    const groups = new Map<string, typeof filteredTransactions>()
+    for (const tx of filteredTransactions) {
       const list = groups.get(tx.date) || []
       list.push(tx)
       groups.set(tx.date, list)
     }
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]))
-  }, [transactions])
+  }, [filteredTransactions])
 
-  function clearFilter() {
+  const monthOptions = useMemo(() => {
+    const options = []
+    const now = new Date()
+    for (let i = 11; i >= -1; i--) {
+      const d = subMonths(now, i)
+      options.push({
+        value: format(d, 'yyyy-MM'),
+        label: format(d, 'MMMM yyyy'),
+      })
+    }
+    return options
+  }, [])
+
+  const currentMonthValue = format(currentDate, 'yyyy-MM')
+
+  function handleMonthSelect(value: string) {
+    if (value == null) return
+    const [year, month] = value.split('-').map(Number)
+    setCurrentDate(new Date(year, month - 1, 1))
+  }
+
+  function clearCategoryParam() {
     navigate(-1)
   }
 
-  function handlePeriodChange(v: string) {
-    if (startFilter || endFilter) {
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev)
-        next.delete('start')
-        next.delete('end')
-        return next
-      })
-    }
-    setPeriod(v as Period)
+  const hasActiveFilters = selectedCategory || selectedAccount || selectedType !== 'all'
+
+  function clearAllFilters() {
+    setSelectedCategory('')
+    setSelectedAccount('')
+    setSelectedType('all')
   }
 
   const hasDateFilter = !!(startFilter && endFilter)
 
+  const categoryItems = [
+    { value: '__all__', label: 'All categories' },
+    ...allCategories.map(c => ({ value: c.id, label: c.name })),
+  ]
+  const accountItems = [
+    { value: '__all__', label: 'All accounts' },
+    ...accounts.map(a => ({ value: a.id, label: a.name })),
+  ]
+  const typeItems = [
+    { value: 'all', label: 'All types' },
+    { value: 'expense', label: 'Expenses' },
+    { value: 'income', label: 'Income' },
+    { value: 'transfer', label: 'Transfers' },
+  ]
+
   return (
     <div className="space-y-4 py-4">
-      {filterCategory && (
+      {categoryParam && filterCategory && (
         <div className="flex items-center gap-2">
           {(() => {
             const Icon = getCategoryIcon(filterCategory.icon)
@@ -102,34 +142,119 @@ export function TransactionsPage() {
               </div>
             )
           })()}
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={clearFilter}>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={clearCategoryParam}>
             <X className="w-4 h-4" />
           </Button>
         </div>
       )}
 
       {!hasDateFilter && (
-        <Tabs value={period} onValueChange={handlePeriodChange}>
-          <TabsList className="w-full">
-            <TabsTrigger value="daily" className="flex-1">Today</TabsTrigger>
-            <TabsTrigger value="weekly" className="flex-1">Week</TabsTrigger>
-            <TabsTrigger value="monthly" className="flex-1">Month</TabsTrigger>
-            <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
+            <SelectTrigger className="w-auto border-none shadow-none font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* Filter toggle */}
+      {!categoryParam && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showFilters || hasActiveFilters ? 'default' : 'outline'}
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-3.5 h-3.5 mr-1" />
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-1 bg-primary-foreground/20 rounded-full px-1.5 text-[10px]">
+                {(selectedCategory ? 1 : 0) + (selectedAccount ? 1 : 0) + (selectedType !== 'all' ? 1 : 0)}
+              </span>
+            )}
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={clearAllFilters}>
+              Clear all
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Filter dropdowns */}
+      {showFilters && !categoryParam && (
+        <div className="grid grid-cols-3 gap-2">
+          <Select
+            value={selectedType}
+            onValueChange={(v) => v != null && setSelectedType(v as TypeFilter)}
+            items={typeItems}
+          >
+            <SelectTrigger className="text-xs h-8">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {typeItems.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedCategory || '__all__'}
+            onValueChange={(v) => v != null && setSelectedCategory(v === '__all__' ? '' : v)}
+            items={categoryItems}
+          >
+            <SelectTrigger className="text-xs h-8">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categoryItems.map(c => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedAccount || '__all__'}
+            onValueChange={(v) => v != null && setSelectedAccount(v === '__all__' ? '' : v)}
+            items={accountItems}
+          >
+            <SelectTrigger className="text-xs h-8">
+              <SelectValue placeholder="Account" />
+            </SelectTrigger>
+            <SelectContent>
+              {accountItems.map(a => (
+                <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
       {loading ? (
         <div className="animate-pulse space-y-2">
           {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-14 bg-muted rounded-lg" />)}
         </div>
-      ) : transactions.length === 0 ? (
+      ) : filteredTransactions.length === 0 ? (
         <EmptyState
           icon={ListOrdered}
           title="No transactions"
           description={filterCategory
             ? `No ${filterCategory.name} transactions found for this period`
-            : `No transactions found for this ${period === 'all' ? 'period' : period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}`}
+            : `No transactions for ${format(currentDate, 'MMMM yyyy')}`}
         />
       ) : (
         <div className="space-y-4">
