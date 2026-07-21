@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
 import { useBudgets } from '@/hooks/useBudgets'
@@ -78,6 +78,12 @@ function SortableAccountItem({
 }
 
 export function AccountsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') || 'accounts'
+  function setActiveTab(tab: string) {
+    setSearchParams({ tab }, { replace: true })
+  }
+
   const { accounts, createAccount, updateAccount, deleteAccount, reorderAccounts } = useAccounts()
   const { balances, loading, refetch } = useAccountBalances(accounts.map(a => a.id))
 
@@ -187,7 +193,7 @@ export function AccountsPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="accounts">
+      <Tabs value={activeTab} onValueChange={(v) => v != null && setActiveTab(v)}>
         <TabsList className="w-full">
           <TabsTrigger value="accounts" className="flex-1">Accounts</TabsTrigger>
           <TabsTrigger value="spending" className="flex-1">Spending</TabsTrigger>
@@ -309,19 +315,25 @@ export function AccountsPage() {
                   return (
                     <div
                       key={s.category_id}
-                      className={`flex items-center gap-3 cursor-pointer rounded-lg p-1.5 -mx-1.5 transition-colors hover:bg-accent/50 ${isExcluded ? 'opacity-40' : ''}`}
-                      onClick={() => toggleCategory(s.category_id)}
+                      className={`flex items-center gap-3 rounded-lg p-1.5 -mx-1.5 transition-colors ${isExcluded ? 'opacity-40' : ''}`}
                     >
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: s.color + '20' }}>
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                        style={{ backgroundColor: s.color + '20' }}
+                        onClick={() => toggleCategory(s.category_id)}
+                      >
                         <Icon className="w-4 h-4" style={{ color: s.color }} />
                       </div>
-                      <div className="flex-1">
+                      <Link
+                        to={`/transactions?category=${s.category_id}&start=${reportStart}&end=${reportEnd}`}
+                        className="flex-1 hover:underline"
+                      >
                         <div className="flex items-center justify-between">
                           <span className="text-sm">{s.name}</span>
                           <span className="text-xs text-muted-foreground">{isExcluded ? 'off' : `${pct}%`}</span>
                         </div>
                         {!isExcluded && <Progress value={pct} className="h-1.5 mt-1" />}
-                      </div>
+                      </Link>
                       <CurrencyDisplay cents={s.personal_total} type="expense" showSign={false} className="text-sm w-20 text-right" />
                     </div>
                   )

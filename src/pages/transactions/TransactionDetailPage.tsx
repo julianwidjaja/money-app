@@ -55,7 +55,7 @@ export function TransactionDetailPage() {
       toast.error('Failed to delete transaction')
     } else {
       toast.success('Transaction deleted')
-      navigate('/transactions')
+      navigate(-1)
     }
   }
 
@@ -73,7 +73,7 @@ export function TransactionDetailPage() {
 
   return (
     <div className="space-y-4 py-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/transactions')}>
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
         <ArrowLeft className="w-4 h-4 mr-1" /> Back
       </Button>
 

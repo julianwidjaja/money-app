@@ -1,22 +1,38 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams, useNavigate } from 'react-router'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { getCategoryIcon } from '@/lib/icons'
-import { ListOrdered, ArrowLeftRight } from 'lucide-react'
+import { ListOrdered, ArrowLeftRight, X } from 'lucide-react'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'all'
 
 export function TransactionsPage() {
-  const [period, setPeriod] = useState<Period>('monthly')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const categoryFilter = searchParams.get('category')
+  const startFilter = searchParams.get('start')
+  const endFilter = searchParams.get('end')
+
+  const [period, setPeriod] = useState<Period>(
+    startFilter && endFilter ? 'all' : 'monthly'
+  )
   const now = new Date()
 
+  const { categories } = useCategories()
+  const filterCategory = categoryFilter ? categories.find(c => c.id === categoryFilter) : null
+
   const dateRange = useMemo(() => {
+    if (startFilter && endFilter) {
+      return { startDate: startFilter, endDate: endFilter }
+    }
     switch (period) {
       case 'daily':
         const today = format(now, 'yyyy-MM-dd')
@@ -34,9 +50,14 @@ export function TransactionsPage() {
       case 'all':
         return {}
     }
-  }, [period])
+  }, [period, startFilter, endFilter])
 
-  const { transactions, loading } = useTransactions(dateRange)
+  const fetchOptions = useMemo(() => ({
+    ...dateRange,
+    ...(categoryFilter ? { categoryId: categoryFilter } : {}),
+  }), [dateRange, categoryFilter])
+
+  const { transactions, loading } = useTransactions(fetchOptions)
 
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, typeof transactions>()
@@ -48,16 +69,55 @@ export function TransactionsPage() {
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [transactions])
 
+  function clearFilter() {
+    navigate(-1)
+  }
+
+  function handlePeriodChange(v: string) {
+    if (startFilter || endFilter) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('start')
+        next.delete('end')
+        return next
+      })
+    }
+    setPeriod(v as Period)
+  }
+
+  const hasDateFilter = !!(startFilter && endFilter)
+
   return (
     <div className="space-y-4 py-4">
-      <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="daily" className="flex-1">Today</TabsTrigger>
-          <TabsTrigger value="weekly" className="flex-1">Week</TabsTrigger>
-          <TabsTrigger value="monthly" className="flex-1">Month</TabsTrigger>
-          <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {filterCategory && (
+        <div className="flex items-center gap-2">
+          {(() => {
+            const Icon = getCategoryIcon(filterCategory.icon)
+            return (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: filterCategory.color + '20' }}>
+                  <Icon className="w-3.5 h-3.5" style={{ color: filterCategory.color }} />
+                </div>
+                <span className="text-sm font-medium truncate">{filterCategory.name}</span>
+              </div>
+            )
+          })()}
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={clearFilter}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      {!hasDateFilter && (
+        <Tabs value={period} onValueChange={handlePeriodChange}>
+          <TabsList className="w-full">
+            <TabsTrigger value="daily" className="flex-1">Today</TabsTrigger>
+            <TabsTrigger value="weekly" className="flex-1">Week</TabsTrigger>
+            <TabsTrigger value="monthly" className="flex-1">Month</TabsTrigger>
+            <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {loading ? (
         <div className="animate-pulse space-y-2">
@@ -67,7 +127,9 @@ export function TransactionsPage() {
         <EmptyState
           icon={ListOrdered}
           title="No transactions"
-          description={`No transactions found for this ${period === 'all' ? 'period' : period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}`}
+          description={filterCategory
+            ? `No ${filterCategory.name} transactions found for this period`
+            : `No transactions found for this ${period === 'all' ? 'period' : period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}`}
         />
       ) : (
         <div className="space-y-4">
