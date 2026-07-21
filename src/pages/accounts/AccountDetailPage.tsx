@@ -1,23 +1,93 @@
-import { useParams } from 'react-router'
-import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, Link } from 'react-router'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
+import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
-import { Link } from 'react-router'
-import { ListOrdered, ArrowLeftRight } from 'lucide-react'
+import { ListOrdered, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns'
 
 export function AccountDetailPage() {
   const { id } = useParams()
+  const { user } = useAuth()
   const { accounts } = useAccounts()
-  const { balances } = useAccountBalances()
-  const { transactions, loading } = useTransactions({ accountId: id })
-
   const account = accounts.find(a => a.id === id)
-  const balance = balances.find(b => b.account_id === id)
+
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const monthStart = format(startOfMonth(currentDate), 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd')
+
+  const { transactions, loading } = useTransactions({
+    accountId: id,
+    startDate: monthStart,
+    endDate: monthEnd,
+  })
+
+  const [startBalance, setStartBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    async function loadStartBalance() {
+      if (!user || !id || !account) return
+
+      const { data } = await supabase
+        .from('transaction_entries')
+        .select('type, amount, group:transaction_groups!inner(date)')
+        .eq('account_id', id)
+        .lt('group.date' as any, monthStart)
+
+      const beforeTotal = (data || []).reduce((sum: number, e: any) => {
+        if (['income', 'transfer_in', 'reimbursement'].includes(e.type)) return sum + e.amount
+        if (['expense', 'transfer_out'].includes(e.type)) return sum - e.amount
+        return sum
+      }, 0)
+
+      setStartBalance(account.initial_balance + beforeTotal)
+    }
+    loadStartBalance()
+  }, [user, id, account, monthStart])
+
+  const monthChange = useMemo(() => {
+    if (!id) return 0
+    return transactions.reduce((sum, tx) => {
+      const entries = tx.entries.filter(e => e.account_id === id)
+      return sum + entries.reduce((s, e) => {
+        if (['income', 'transfer_in', 'reimbursement'].includes(e.type)) return s + e.amount
+        if (['expense', 'transfer_out'].includes(e.type)) return s - e.amount
+        return s
+      }, 0)
+    }, 0)
+  }, [transactions, id])
+
+  const endBalance = startBalance != null ? startBalance + monthChange : null
+
+  const monthOptions = useMemo(() => {
+    const options = []
+    const now = new Date()
+    for (let i = 11; i >= -1; i--) {
+      const d = subMonths(now, i)
+      options.push({
+        value: format(d, 'yyyy-MM'),
+        label: format(d, 'MMMM yyyy'),
+      })
+    }
+    return options
+  }, [])
+
+  const currentMonthValue = format(currentDate, 'yyyy-MM')
+
+  function handleMonthSelect(value: string) {
+    if (value == null) return
+    const [year, month] = value.split('-').map(Number)
+    setCurrentDate(new Date(year, month - 1, 1))
+  }
 
   if (!account) {
     return <div className="py-12 text-center text-muted-foreground">Account not found</div>
@@ -29,18 +99,56 @@ export function AccountDetailPage() {
         <CardContent className="pt-6 text-center">
           <p className="text-sm text-muted-foreground">{account.name}</p>
           <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</p>
-          {balance ? (
-            <CurrencyDisplay
-              cents={balance.current_balance}
-              type={balance.current_balance < 0 ? 'expense' : 'neutral'}
-              showSign={balance.current_balance < 0}
-              className="text-3xl font-bold mt-2"
-            />
-          ) : (
-            <p className="text-3xl font-bold mt-2">—</p>
-          )}
         </CardContent>
       </Card>
+
+      {/* Month picker */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
+          <SelectTrigger className="w-auto border-none shadow-none font-medium">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Balance summary */}
+      {startBalance != null && endBalance != null && (
+        <Card>
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Start</p>
+                <p className={`font-medium ${startBalance < 0 ? 'text-destructive' : ''}`}>
+                  {formatCurrency(startBalance)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Change</p>
+                <p className={`font-medium ${monthChange > 0 ? 'text-green-600' : monthChange < 0 ? 'text-destructive' : ''}`}>
+                  {monthChange >= 0 ? '+' : ''}{formatCurrency(monthChange)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">End</p>
+                <p className={`font-medium ${endBalance < 0 ? 'text-destructive' : ''}`}>
+                  {formatCurrency(endBalance)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Transactions</h2>
 
@@ -49,9 +157,9 @@ export function AccountDetailPage() {
           {[1, 2, 3].map(i => <div key={i} className="h-14 bg-muted rounded-lg" />)}
         </div>
       ) : transactions.length === 0 ? (
-        <EmptyState icon={ListOrdered} title="No transactions" description="No transactions for this account yet" />
+        <EmptyState icon={ListOrdered} title="No transactions" description={`No transactions for ${format(currentDate, 'MMMM yyyy')}`} />
       ) : (
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-2">
           {transactions.map(tx => {
             const entriesForAccount = tx.entries.filter(e => e.account_id === id)
             if (entriesForAccount.length === 0) return null
@@ -69,7 +177,7 @@ export function AccountDetailPage() {
             const Icon = isTransfer ? ArrowLeftRight : getCategoryIcon(cat?.icon)
 
             return (
-              <Link key={tx.id} to={`/transactions/${tx.id}`}>
+              <Link key={tx.id} to={`/transactions/${tx.id}`} className="block">
                 <Card className="hover:bg-accent/50 transition-colors">
                   <CardContent className="flex items-center gap-3 py-3 px-4">
                     <div
