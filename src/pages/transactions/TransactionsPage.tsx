@@ -92,7 +92,7 @@ export function TransactionsPage() {
 
   const currentMonthValue = format(currentDate, 'yyyy-MM')
 
-  function handleMonthSelect(value: string) {
+  function handleMonthSelect(value: string | null) {
     if (value == null) return
     const [year, month] = value.split('-').map(Number)
     setCurrentDate(new Date(year, month - 1, 1))

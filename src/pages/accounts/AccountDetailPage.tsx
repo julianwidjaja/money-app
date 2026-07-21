@@ -41,8 +41,10 @@ export function AccountDetailPage() {
         .from('transaction_entries')
         .select('type, amount, group:transaction_groups!inner(date)')
         .eq('account_id', id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lt('group.date' as any, monthStart)
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const beforeTotal = (data || []).reduce((sum: number, e: any) => {
         if (['income', 'transfer_in', 'reimbursement'].includes(e.type)) return sum + e.amount
         if (['expense', 'transfer_out'].includes(e.type)) return sum - e.amount
@@ -83,7 +85,7 @@ export function AccountDetailPage() {
 
   const currentMonthValue = format(currentDate, 'yyyy-MM')
 
-  function handleMonthSelect(value: string) {
+  function handleMonthSelect(value: string | null) {
     if (value == null) return
     const [year, month] = value.split('-').map(Number)
     setCurrentDate(new Date(year, month - 1, 1))
