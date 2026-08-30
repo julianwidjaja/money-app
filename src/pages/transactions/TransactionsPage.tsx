@@ -16,16 +16,31 @@ import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns
 type TypeFilter = 'all' | 'expense' | 'income' | 'transfer'
 
 export function TransactionsPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const categoryParam = searchParams.get('category')
   const startFilter = searchParams.get('start')
   const endFilter = searchParams.get('end')
+  const monthParam = searchParams.get('month')
 
-  const [currentDate, setCurrentDate] = useState(() => {
+  const currentDate = useMemo(() => {
+    if (monthParam) {
+      const [y, m] = monthParam.split('-').map(Number)
+      return new Date(y, m - 1, 1)
+    }
     if (startFilter) return new Date(startFilter + 'T00:00:00')
     return new Date()
-  })
+  }, [monthParam, startFilter])
+
+  function setCurrentDate(updater: (d: Date) => Date) {
+    const next = updater(currentDate)
+    const val = format(next, 'yyyy-MM')
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('month', val)
+      return next
+    }, { replace: true })
+  }
 
   const [showFilters, setShowFilters] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
@@ -94,8 +109,11 @@ export function TransactionsPage() {
 
   function handleMonthSelect(value: string | null) {
     if (value == null) return
-    const [year, month] = value.split('-').map(Number)
-    setCurrentDate(new Date(year, month - 1, 1))
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('month', value)
+      return next
+    }, { replace: true })
   }
 
   function clearCategoryParam() {

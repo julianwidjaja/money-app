@@ -105,7 +105,23 @@ export function AccountsPage() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  const [reportDate, setReportDate] = useState(new Date())
+  const reportMonthParam = searchParams.get('month')
+  const reportDate = useMemo(() => {
+    if (reportMonthParam) {
+      const [y, m] = reportMonthParam.split('-').map(Number)
+      return new Date(y, m - 1, 1)
+    }
+    return new Date()
+  }, [reportMonthParam])
+
+  function setReportDate(updater: (d: Date) => Date) {
+    const next = updater(reportDate)
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      p.set('month', format(next, 'yyyy-MM'))
+      return p
+    }, { replace: true })
+  }
   const reportStart = format(startOfMonth(reportDate), 'yyyy-MM-dd')
   const reportEnd = format(endOfMonth(reportDate), 'yyyy-MM-dd')
   const { spending, loading: spendingLoading } = useCategorySpending(reportStart, reportEnd)

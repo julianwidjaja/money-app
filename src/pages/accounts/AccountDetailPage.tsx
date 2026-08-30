@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, Link } from 'react-router'
+import { useParams, Link, useSearchParams } from 'react-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -18,10 +18,24 @@ import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns
 export function AccountDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { accounts } = useAccounts()
   const account = accounts.find(a => a.id === id)
 
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const monthParam = searchParams.get('month')
+  const currentDate = useMemo(() => {
+    if (monthParam) {
+      const [y, m] = monthParam.split('-').map(Number)
+      return new Date(y, m - 1, 1)
+    }
+    return new Date()
+  }, [monthParam])
+
+  function setCurrentDate(updater: (d: Date) => Date) {
+    const next = updater(currentDate)
+    setSearchParams({ month: format(next, 'yyyy-MM') }, { replace: true })
+  }
+
   const monthStart = format(startOfMonth(currentDate), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd')
 
@@ -87,8 +101,7 @@ export function AccountDetailPage() {
 
   function handleMonthSelect(value: string | null) {
     if (value == null) return
-    const [year, month] = value.split('-').map(Number)
-    setCurrentDate(new Date(year, month - 1, 1))
+    setSearchParams({ month: value }, { replace: true })
   }
 
   if (!account) {
