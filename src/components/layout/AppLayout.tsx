@@ -6,7 +6,7 @@ export function AppLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <TopBar />
-      <main className="flex-1 pb-20 px-4 max-w-2xl mx-auto w-full">
+      <main className="flex-1 pb-20 px-4 max-w-2xl mx-auto w-full overflow-hidden">
         <Outlet />
       </main>
       <BottomNav />
