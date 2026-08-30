@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
+import { useSettings } from '@/hooks/useSettings'
 import { useBudgets } from '@/hooks/useBudgets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -87,16 +88,20 @@ export function AccountsPage() {
   const { accounts, createAccount, updateAccount, deleteAccount, reorderAccounts } = useAccounts()
   const { balances, loading, refetch } = useAccountBalances(accounts.map(a => a.id))
 
+  const { isFeatureEnabled } = useSettings()
+
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [type, setType] = useState<AccountType | ''>('')
   const [initialBalance, setInitialBalance] = useState(0)
+  const [interestRate, setInterestRate] = useState('')
   const [saving, setSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editType, setEditType] = useState<AccountType | ''>('')
+  const [editInterestRate, setEditInterestRate] = useState('')
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -139,22 +144,26 @@ export function AccountsPage() {
     if (!name.trim()) { toast.error('Enter account name'); return }
     if (!type) { toast.error('Select account type'); return }
     setSaving(true)
+    const parsedRate = interestRate ? parseFloat(interestRate) : null
     const result = await createAccount({
       name: name.trim(), type: type as AccountType, initial_balance: initialBalance,
+      interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null, interest_last_applied: null,
       icon: null, color: null, is_archived: false, sort_order: accounts.length,
     })
     setSaving(false)
     if (result?.error) { toast.error('Failed to create account') }
     else {
       toast.success('Account created')
-      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); refetch()
+      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setInterestRate(''); refetch()
     }
   }
 
   function openEdit(accountId: string) {
     const account = accounts.find(a => a.id === accountId)
     if (!account) return
-    setEditId(account.id); setEditName(account.name); setEditType(account.type); setEditOpen(true)
+    setEditId(account.id); setEditName(account.name); setEditType(account.type)
+    setEditInterestRate(account.interest_rate != null ? String(account.interest_rate) : '')
+    setEditOpen(true)
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -162,7 +171,12 @@ export function AccountsPage() {
     if (!editName.trim()) { toast.error('Enter account name'); return }
     if (!editType) { toast.error('Select account type'); return }
     setSaving(true)
-    const result = await updateAccount(editId, { name: editName.trim(), type: editType as AccountType })
+    const parsedRate = editInterestRate ? parseFloat(editInterestRate) : null
+    const result = await updateAccount(editId, {
+      name: editName.trim(),
+      type: editType as AccountType,
+      interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null,
+    })
     setSaving(false)
     if (result?.error) { toast.error('Failed to update account') }
     else { toast.success('Account updated'); setEditOpen(false); refetch() }
@@ -230,6 +244,12 @@ export function AccountsPage() {
                     <Label>Current Balance</Label>
                     <AmountInput value={initialBalance} onChange={setInitialBalance} allowNegative />
                   </div>
+                  {isFeatureEnabled('feature_interest') && (type === 'savings' || type === 'chequing') && (
+                    <div className="space-y-1.5">
+                      <Label>Interest Rate (% per year)</Label>
+                      <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={interestRate} onChange={e => setInterestRate(e.target.value)} />
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={saving}>
                     {saving ? 'Creating...' : 'Create Account'}
                   </Button>
@@ -405,6 +425,12 @@ export function AccountsPage() {
                 </SelectContent>
               </Select>
             </div>
+            {isFeatureEnabled('feature_interest') && (editType === 'savings' || editType === 'chequing') && (
+              <div className="space-y-1.5">
+                <Label>Interest Rate (% per year)</Label>
+                <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={editInterestRate} onChange={e => setEditInterestRate(e.target.value)} />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>

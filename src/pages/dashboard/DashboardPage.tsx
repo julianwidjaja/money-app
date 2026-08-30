@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
-import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
+import { useAccounts, useAccountBalances, generateInterest } from '@/hooks/useAccounts'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useRecurring } from '@/hooks/useRecurring'
@@ -19,6 +20,7 @@ import { Wallet, ArrowRight, TrendingDown } from 'lucide-react'
 import { getCategoryIcon } from '@/lib/icons'
 
 export function DashboardPage() {
+  const { user } = useAuth()
   const { accounts } = useAccounts()
   const { balances, loading: balancesLoading } = useAccountBalances(accounts.map(a => a.id))
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
@@ -36,6 +38,9 @@ export function DashboardPage() {
 
   useEffect(() => {
     generatePendingTransactions()
+    if (user && isFeatureEnabled('feature_interest')) {
+      generateInterest(user.id)
+    }
   }, [])
 
   const totalBalance = balances.reduce((sum, b) => sum + b.current_balance, 0)

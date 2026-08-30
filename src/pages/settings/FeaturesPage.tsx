@@ -1,6 +1,6 @@
 import { useSettings } from '@/hooks/useSettings'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Repeat, Bell, ArrowRightLeft, Layers } from 'lucide-react'
+import { Users, Repeat, Bell, ArrowRightLeft, Layers, Percent } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface FeatureToggle {
@@ -40,6 +40,12 @@ const features: FeatureToggle[] = [
     icon: Layers,
     name: 'Multi-account transfers',
     description: 'Transfer between multiple source and destination accounts at once',
+  },
+  {
+    key: 'feature_interest',
+    icon: Percent,
+    name: 'Auto interest',
+    description: 'Automatically add monthly interest to savings and chequing accounts',
   },
 ]
 

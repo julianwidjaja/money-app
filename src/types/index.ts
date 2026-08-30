@@ -12,6 +12,8 @@ export interface Account {
   icon: string | null
   color: string | null
   initial_balance: number
+  interest_rate: number | null
+  interest_last_applied: string | null
   is_archived: boolean
   sort_order: number
   created_at: string
