@@ -47,7 +47,15 @@ export function useRecurring() {
     if (!user) return
     const today = startOfDay(new Date())
 
-    for (const rule of rules) {
+    const { data: freshRules } = await supabase
+      .from('recurring_rules')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    if (!freshRules || freshRules.length === 0) return
+
+    for (const rule of freshRules) {
       const lastGenerated = rule.last_generated_date
         ? startOfDay(new Date(rule.last_generated_date + 'T00:00:00'))
         : null
