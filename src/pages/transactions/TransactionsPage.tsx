@@ -42,10 +42,32 @@ export function TransactionsPage() {
     }, { replace: true })
   }
 
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
-  const [selectedAccount, setSelectedAccount] = useState('')
-  const [selectedType, setSelectedType] = useState<TypeFilter>('all')
+  const selectedCategory = searchParams.get('fc') || ''
+  const selectedAccount = searchParams.get('fa') || ''
+  const selectedType = (searchParams.get('ft') || 'all') as TypeFilter
+  const [showFilters, setShowFilters] = useState(!!(selectedCategory || selectedAccount || selectedType !== 'all'))
+
+  function setSelectedCategory(v: string) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v) p.set('fc', v); else p.delete('fc')
+      return p
+    }, { replace: true })
+  }
+  function setSelectedAccount(v: string) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v) p.set('fa', v); else p.delete('fa')
+      return p
+    }, { replace: true })
+  }
+  function setSelectedType(v: TypeFilter) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v !== 'all') p.set('ft', v); else p.delete('ft')
+      return p
+    }, { replace: true })
+  }
 
   const { categories, expenseCategories, incomeCategories } = useCategories()
   const { accounts } = useAccounts()
@@ -123,9 +145,13 @@ export function TransactionsPage() {
   const hasActiveFilters = selectedCategory || selectedAccount || selectedType !== 'all'
 
   function clearAllFilters() {
-    setSelectedCategory('')
-    setSelectedAccount('')
-    setSelectedType('all')
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      p.delete('fc')
+      p.delete('fa')
+      p.delete('ft')
+      return p
+    }, { replace: true })
   }
 
   const hasDateFilter = !!(startFilter && endFilter)
