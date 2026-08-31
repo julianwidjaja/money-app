@@ -15,8 +15,39 @@ import { RECURRENCE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
 import { toast } from 'sonner'
 import { Repeat, Plus, Trash2, Pencil } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, addMonths, addYears } from 'date-fns'
 import type { EntryType, RecurrenceFrequency, RecurringRule } from '@/types'
+
+function computeStartDate(day: number, freq: string): string {
+  const today = new Date()
+  const todayStr = format(today, 'yyyy-MM-dd')
+
+  if (freq === 'weekly' || freq === 'biweekly') {
+    const currentDay = today.getDay() || 7
+    let diff = day - currentDay
+    if (diff <= 0) diff += 7
+    const next = new Date(today)
+    next.setDate(today.getDate() + diff)
+    return format(next, 'yyyy-MM-dd')
+  }
+
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const d = Math.min(day, daysInMonth)
+  const thisMonth = new Date(year, month, d)
+  const thisMonthStr = format(thisMonth, 'yyyy-MM-dd')
+
+  if (thisMonthStr >= todayStr) return thisMonthStr
+  if (freq === 'yearly') return format(addYears(thisMonth, 1), 'yyyy-MM-dd')
+  return format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
+}
+
+function extractDay(dateStr: string, freq: string): number {
+  const d = new Date(dateStr + 'T00:00:00')
+  if (freq === 'weekly' || freq === 'biweekly') return d.getDay() || 7
+  return d.getDate()
+}
 
 export function RecurringSettingsPage() {
   const { rules, loading, createRule, updateRule, deleteRule } = useRecurring()
@@ -40,6 +71,7 @@ export function RecurringSettingsPage() {
   const [editAccountId, setEditAccountId] = useState('')
   const [editCategoryId, setEditCategoryId] = useState('')
   const [editFrequency, setEditFrequency] = useState<RecurrenceFrequency>('monthly')
+  const [editDueDay, setEditDueDay] = useState('1')
   const [editDescription, setEditDescription] = useState('')
 
   const categories = txType === 'expense' ? expenseCategories : incomeCategories
@@ -52,6 +84,7 @@ export function RecurringSettingsPage() {
     setEditAccountId(rule.template_account_id)
     setEditCategoryId(rule.template_category_id || '')
     setEditFrequency(rule.frequency)
+    setEditDueDay(String(extractDay(rule.last_generated_date || rule.start_date, rule.frequency)))
     setEditDescription(rule.template_description || '')
     setEditOpen(true)
   }
@@ -93,8 +126,12 @@ export function RecurringSettingsPage() {
     if (!editCategoryId) { toast.error('Select a category'); return }
 
     setSaving(true)
+    const parsedDay = parseInt(editDueDay) || 1
+    const newStartDate = computeStartDate(parsedDay, editFrequency)
     const result = await updateRule(editRule.id, {
       frequency: editFrequency,
+      start_date: newStartDate,
+      last_generated_date: newStartDate,
       template_description: editDescription || null,
       template_account_id: editAccountId,
       template_category_id: editCategoryId,
@@ -124,6 +161,7 @@ export function RecurringSettingsPage() {
     accId: string, setAccId: (v: string) => void,
     catId: string, setCatId: (v: string) => void,
     freq: RecurrenceFrequency, setFreq: (v: RecurrenceFrequency) => void,
+    dayOrDate: string, setDayOrDate: (v: string) => void,
     desc: string, setDesc: (v: string) => void,
     cats: typeof expenseCategories,
   ) {
@@ -182,10 +220,24 @@ export function RecurringSettingsPage() {
             </SelectContent>
           </Select>
         </div>
-        {mode === 'create' && (
+        {mode === 'create' ? (
           <div className="space-y-1.5">
             <Label>Start Date</Label>
-            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <Input type="date" value={dayOrDate} onChange={e => setDayOrDate(e.target.value)} />
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label>
+              {freq === 'weekly' || freq === 'biweekly' ? 'Day of Week (1=Mon, 7=Sun)' : 'Day of Month'}
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              max={freq === 'weekly' || freq === 'biweekly' ? 7 : 31}
+              value={dayOrDate}
+              onChange={e => setDayOrDate(e.target.value)}
+              className="text-sm"
+            />
           </div>
         )}
         <div className="space-y-1.5">
@@ -209,7 +261,7 @@ export function RecurringSettingsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New Recurring Transaction</DialogTitle></DialogHeader>
-            {renderForm('create', handleCreate, txType, setTxType, amount, setAmount, accountId, setAccountId, categoryId, setCategoryId, frequency, setFrequency, description, setDescription, categories)}
+            {renderForm('create', handleCreate, txType, setTxType, amount, setAmount, accountId, setAccountId, categoryId, setCategoryId, frequency, setFrequency, startDate, setStartDate, description, setDescription, categories)}
           </DialogContent>
         </Dialog>
       </div>
@@ -232,7 +284,7 @@ export function RecurringSettingsPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{r.template_description || 'Recurring transaction'}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatCurrency(r.template_amount)} · {RECURRENCE_LABELS[r.frequency]}
+                    {formatCurrency(r.template_amount)} · {RECURRENCE_LABELS[r.frequency]} · Day {extractDay(r.last_generated_date || r.start_date, r.frequency)}
                   </p>
                 </div>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditDialog(r)}>
@@ -251,7 +303,7 @@ export function RecurringSettingsPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Recurring Transaction</DialogTitle></DialogHeader>
-          {renderForm('edit', handleEdit, editTxType, setEditTxType, editAmount, setEditAmount, editAccountId, setEditAccountId, editCategoryId, setEditCategoryId, editFrequency, setEditFrequency, editDescription, setEditDescription, editCategories)}
+          {renderForm('edit', handleEdit, editTxType, setEditTxType, editAmount, setEditAmount, editAccountId, setEditAccountId, editCategoryId, setEditCategoryId, editFrequency, setEditFrequency, editDueDay, setEditDueDay, editDescription, setEditDescription, editCategories)}
         </DialogContent>
       </Dialog>
     </div>
