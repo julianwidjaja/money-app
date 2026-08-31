@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
 import { useSettings } from '@/hooks/useSettings'
+import { createCCReminders, updateCCReminders, deleteCCReminders } from '@/hooks/useReminders'
 import { useBudgets } from '@/hooks/useBudgets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -95,6 +96,8 @@ export function AccountsPage() {
   const [type, setType] = useState<AccountType | ''>('')
   const [initialBalance, setInitialBalance] = useState(0)
   const [interestRate, setInterestRate] = useState('')
+  const [creditLimit, setCreditLimit] = useState(0)
+  const [statementDay, setStatementDay] = useState('')
   const [saving, setSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -102,6 +105,8 @@ export function AccountsPage() {
   const [editName, setEditName] = useState('')
   const [editType, setEditType] = useState<AccountType | ''>('')
   const [editInterestRate, setEditInterestRate] = useState('')
+  const [editCreditLimit, setEditCreditLimit] = useState(0)
+  const [editStatementDay, setEditStatementDay] = useState('')
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -161,16 +166,22 @@ export function AccountsPage() {
     if (!type) { toast.error('Select account type'); return }
     setSaving(true)
     const parsedRate = interestRate ? parseFloat(interestRate) : null
+    const parsedStmtDay = statementDay ? parseInt(statementDay) : null
     const result = await createAccount({
       name: name.trim(), type: type as AccountType, initial_balance: initialBalance,
       interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null, interest_last_applied: null,
+      credit_limit: type === 'credit_card' && creditLimit > 0 ? creditLimit : null,
+      statement_day: type === 'credit_card' && parsedStmtDay && parsedStmtDay >= 1 && parsedStmtDay <= 31 ? parsedStmtDay : null,
       icon: null, color: null, is_archived: false, sort_order: accounts.length,
     })
     setSaving(false)
     if (result?.error) { toast.error('Failed to create account') }
     else {
+      if (result?.data && type === 'credit_card' && creditLimit > 0 && parsedStmtDay) {
+        await createCCReminders(result.data as Account)
+      }
       toast.success('Account created')
-      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setInterestRate(''); refetch()
+      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setInterestRate(''); setCreditLimit(0); setStatementDay(''); refetch()
     }
   }
 
@@ -179,6 +190,8 @@ export function AccountsPage() {
     if (!account) return
     setEditId(account.id); setEditName(account.name); setEditType(account.type)
     setEditInterestRate(account.interest_rate != null ? String(account.interest_rate) : '')
+    setEditCreditLimit(account.credit_limit ?? 0)
+    setEditStatementDay(account.statement_day != null ? String(account.statement_day) : '')
     setEditOpen(true)
   }
 
@@ -188,14 +201,26 @@ export function AccountsPage() {
     if (!editType) { toast.error('Select account type'); return }
     setSaving(true)
     const parsedRate = editInterestRate ? parseFloat(editInterestRate) : null
+    const parsedStmtDay = editStatementDay ? parseInt(editStatementDay) : null
+    const ccLimit = editType === 'credit_card' && editCreditLimit > 0 ? editCreditLimit : null
+    const stmtDay = editType === 'credit_card' && parsedStmtDay && parsedStmtDay >= 1 && parsedStmtDay <= 31 ? parsedStmtDay : null
     const result = await updateAccount(editId, {
       name: editName.trim(),
       type: editType as AccountType,
       interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null,
+      credit_limit: ccLimit,
+      statement_day: stmtDay,
     })
     setSaving(false)
     if (result?.error) { toast.error('Failed to update account') }
-    else { toast.success('Account updated'); setEditOpen(false); refetch() }
+    else {
+      if (editType === 'credit_card' && ccLimit && stmtDay) {
+        await updateCCReminders({ ...result.data, credit_limit: ccLimit, statement_day: stmtDay } as Account)
+      } else {
+        await deleteCCReminders(editId)
+      }
+      toast.success('Account updated'); setEditOpen(false); refetch()
+    }
   }
 
   async function handleDelete(accountId: string) {
@@ -265,6 +290,18 @@ export function AccountsPage() {
                       <Label>Interest Rate (% per year)</Label>
                       <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={interestRate} onChange={e => setInterestRate(e.target.value)} />
                     </div>
+                  )}
+                  {type === 'credit_card' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label>Credit Limit</Label>
+                        <AmountInput value={creditLimit} onChange={setCreditLimit} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Statement Day (1-31)</Label>
+                        <Input type="number" min={1} max={31} placeholder="e.g. 15" value={statementDay} onChange={e => setStatementDay(e.target.value)} />
+                      </div>
+                    </>
                   )}
                   <Button type="submit" className="w-full" disabled={saving}>
                     {saving ? 'Creating...' : 'Create Account'}
@@ -446,6 +483,18 @@ export function AccountsPage() {
                 <Label>Interest Rate (% per year)</Label>
                 <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={editInterestRate} onChange={e => setEditInterestRate(e.target.value)} />
               </div>
+            )}
+            {editType === 'credit_card' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Credit Limit</Label>
+                  <AmountInput value={editCreditLimit} onChange={setEditCreditLimit} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Statement Day (1-31)</Label>
+                  <Input type="number" min={1} max={31} placeholder="e.g. 15" value={editStatementDay} onChange={e => setEditStatementDay(e.target.value)} />
+                </div>
+              </>
             )}
             <Button type="submit" className="w-full" disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}

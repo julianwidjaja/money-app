@@ -14,6 +14,8 @@ export interface Account {
   initial_balance: number
   interest_rate: number | null
   interest_last_applied: string | null
+  credit_limit: number | null
+  statement_day: number | null
   is_archived: boolean
   sort_order: number
   created_at: string

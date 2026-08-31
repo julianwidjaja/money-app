@@ -244,6 +244,7 @@ export function RemindersPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium">{r.title}</p>
                       {isDue && <Badge variant="secondary" className="text-warning border-warning/30 text-xs">Due</Badge>}
+                      {r.is_auto && <Badge variant="secondary" className="text-xs">Auto</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {RECURRENCE_LABELS[r.frequency] || r.frequency} · Next: {formatDate(r.next_due, 'long')}
@@ -251,12 +252,16 @@ export function RemindersPage() {
                       {account && ` · ${account.name}`}
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(r.id)}>
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(r.id)}>
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  </Button>
+                  {!r.is_auto && (
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(r.id)}>
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
+                  {!r.is_auto && (
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(r.id)}>
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )

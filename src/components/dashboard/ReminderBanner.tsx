@@ -4,22 +4,45 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
+import { formatCurrency } from '@/lib/utils'
 import { Bell, Check, ChevronRight, ArrowRight } from 'lucide-react'
 import type { Reminder, FundingBreakdown } from '@/hooks/useReminders'
+import type { Account, AccountBalance } from '@/types'
 
 interface ReminderBannerProps {
   reminders: Reminder[]
   accountNames: Map<string, string>
+  accounts: Account[]
+  balances: AccountBalance[]
   onDismiss: (id: string, details?: { funded: FundingBreakdown[]; unfundedTotal: number }) => void
   onGetDetails: (reminder: Reminder) => Promise<{ funded: FundingBreakdown[]; unfundedTotal: number }>
 }
 
-export function ReminderBanner({ reminders, accountNames, onDismiss, onGetDetails }: ReminderBannerProps) {
+export function ReminderBanner({ reminders, accountNames, accounts, balances, onDismiss, onGetDetails }: ReminderBannerProps) {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
   const [details, setDetails] = useState<{ funded: FundingBreakdown[]; unfundedTotal: number } | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
 
   if (reminders.length === 0) return null
+
+  function getCCInfo(reminder: Reminder) {
+    if (!reminder.is_auto || !reminder.account_id) return null
+    const account = accounts.find(a => a.id === reminder.account_id)
+    if (!account || account.type !== 'credit_card' || !account.credit_limit) return null
+    const balance = balances.find(b => b.account_id === account.id)
+    if (!balance) return null
+
+    const currentOwed = Math.abs(Math.min(balance.current_balance, 0))
+    const target9pct = Math.round(account.credit_limit * 0.09)
+    const isPreStatement = reminder.title.includes('to 9%')
+
+    if (isPreStatement) {
+      const amountToPay = Math.max(0, currentOwed - target9pct)
+      return { currentOwed, target9pct, amountToPay, creditLimit: account.credit_limit, isPreStatement: true }
+    } else {
+      return { currentOwed, target9pct, amountToPay: currentOwed, creditLimit: account.credit_limit, isPreStatement: false }
+    }
+  }
 
   async function openDetails(reminder: Reminder) {
     setSelectedReminder(reminder)
@@ -37,31 +60,42 @@ export function ReminderBanner({ reminders, accountNames, onDismiss, onGetDetail
   }
 
   const grandTotal = details ? details.funded.reduce((s, f) => s + f.total, 0) + details.unfundedTotal : 0
+  const selectedCCInfo = selectedReminder ? getCCInfo(selectedReminder) : null
 
   return (
     <>
       <div className="space-y-2">
-        {reminders.map(r => (
-          <Card key={r.id} className="border-warning/50 bg-warning/5">
-            <CardContent className="flex items-center gap-3 py-3 px-4">
-              <Bell className="w-5 h-5 text-warning shrink-0" />
-              <button onClick={() => openDetails(r)} className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium">{r.title}</p>
-                {r.account_id && accountNames.get(r.account_id) && (
-                  <p className="text-xs text-muted-foreground">{accountNames.get(r.account_id)}</p>
-                )}
-              </button>
-              <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => openDetails(r)}>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => onDismiss(r.id)}>
-                  <Check className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {reminders.map(r => {
+          const ccInfo = getCCInfo(r)
+          return (
+            <Card key={r.id} className="border-warning/50 bg-warning/5">
+              <CardContent className="flex items-center gap-3 py-3 px-4">
+                <Bell className="w-5 h-5 text-warning shrink-0" />
+                <button onClick={() => openDetails(r)} className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium">{r.title}</p>
+                  {ccInfo && (
+                    <p className="text-xs text-muted-foreground">
+                      {ccInfo.isPreStatement
+                        ? `Pay ${formatCurrency(ccInfo.amountToPay)} to reach 9% utilization`
+                        : `Pay remaining ${formatCurrency(ccInfo.amountToPay)}`}
+                    </p>
+                  )}
+                  {!ccInfo && r.account_id && accountNames.get(r.account_id) && (
+                    <p className="text-xs text-muted-foreground">{accountNames.get(r.account_id)}</p>
+                  )}
+                </button>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => openDetails(r)}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => onDismiss(r.id)}>
+                    <Check className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       <Dialog open={selectedReminder !== null} onOpenChange={(open) => { if (!open) { setSelectedReminder(null); setDetails(null) } }}>
@@ -79,6 +113,40 @@ export function ReminderBanner({ reminders, accountNames, onDismiss, onGetDetail
                 <p className="text-sm text-muted-foreground">
                   Account: {accountNames.get(selectedReminder.account_id)}
                 </p>
+              )}
+
+              {/* CC utilization summary */}
+              {selectedCCInfo && (
+                <Card>
+                  <CardContent className="py-3 px-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Current owed</span>
+                      <span>{formatCurrency(selectedCCInfo.currentOwed)}</span>
+                    </div>
+                    {selectedCCInfo.isPreStatement && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">9% target</span>
+                          <span>{formatCurrency(selectedCCInfo.target9pct)}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Amount to pay</span>
+                          <CurrencyDisplay cents={selectedCCInfo.amountToPay} type="expense" showSign={false} />
+                        </div>
+                      </>
+                    )}
+                    {!selectedCCInfo.isPreStatement && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Pay remaining</span>
+                          <CurrencyDisplay cents={selectedCCInfo.amountToPay} type="expense" showSign={false} />
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
 
               <div className="space-y-4">

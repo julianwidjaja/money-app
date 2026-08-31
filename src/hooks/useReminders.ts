@@ -12,6 +12,7 @@ export interface Reminder {
   due_day: number
   next_due: string
   last_dismissed_at: string | null
+  is_auto: boolean
   is_active: boolean
   created_at: string
 }
@@ -195,6 +196,66 @@ export function useReminders() {
   }
 
   return { reminders, dueReminders, loading, createReminder, updateReminder, dismissReminder, deleteReminder, getReminderDetails, getReminderHistory, refetch: fetchReminders }
+}
+
+function wrapDay(day: number): number {
+  if (day < 1) return day + 28
+  if (day > 28) return day - 28
+  return day
+}
+
+function computeFirstDueForDay(dueDay: number): string {
+  const today = new Date()
+  const todayStr = format(today, 'yyyy-MM-dd')
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const day = Math.min(dueDay, daysInMonth)
+  const thisMonth = new Date(year, month, day)
+  const thisMonthStr = format(thisMonth, 'yyyy-MM-dd')
+  if (thisMonthStr >= todayStr) return thisMonthStr
+  return format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
+}
+
+export async function createCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null }) {
+  if (!account.statement_day || !account.credit_limit) return
+
+  const preDay = wrapDay(account.statement_day - 3)
+  const postDay = wrapDay(account.statement_day + 1)
+
+  await supabase.from('reminders').insert([
+    {
+      user_id: account.user_id,
+      title: `Pay ${account.name} to 9%`,
+      account_id: account.id,
+      frequency: 'monthly',
+      due_day: preDay,
+      next_due: computeFirstDueForDay(preDay),
+      is_auto: true,
+    },
+    {
+      user_id: account.user_id,
+      title: `Pay remaining ${account.name}`,
+      account_id: account.id,
+      frequency: 'monthly',
+      due_day: postDay,
+      next_due: computeFirstDueForDay(postDay),
+      is_auto: true,
+    },
+  ])
+}
+
+export async function deleteCCReminders(accountId: string) {
+  await supabase
+    .from('reminders')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('is_auto', true)
+}
+
+export async function updateCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null }) {
+  await deleteCCReminders(account.id)
+  await createCCReminders(account)
 }
 
 function computeNextDue(currentDue: string, frequency: string): string {

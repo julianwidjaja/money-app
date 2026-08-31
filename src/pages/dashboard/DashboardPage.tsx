@@ -50,7 +50,7 @@ export function DashboardPage() {
     <div className="space-y-6 py-4">
       {/* Reminder Banner */}
       {isFeatureEnabled('feature_reminders') && dueReminders.length > 0 && (
-        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} onDismiss={dismissReminder} onGetDetails={getReminderDetails} />
+        <ReminderBanner reminders={dueReminders} accountNames={accountNameMap} accounts={accounts} balances={balances} onDismiss={dismissReminder} onGetDetails={getReminderDetails} />
       )}
 
       {/* Net Balance */}
