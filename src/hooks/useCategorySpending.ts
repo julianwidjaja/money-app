@@ -24,16 +24,17 @@ export function useCategorySpending(startDate: string, endDate: string) {
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .eq('is_personal_expense', true)
-      .gte('transaction_groups.date', startDate)
-      .lte('transaction_groups.date', endDate)
+      .gte('group.date', startDate)
+      .lte('group.date', endDate)
 
     if (error || !data) { setLoading(false); return }
 
     const categoryMap = new Map<string, CategorySpending>()
 
     for (const entry of data) {
-      const cat = entry.category as { id: string; name: string; icon: string; color: string } | null
-      if (!cat) continue
+      const raw = entry.category as any
+      const cat = Array.isArray(raw) ? raw[0] : raw
+      if (!cat?.id) continue
 
       const existing = categoryMap.get(cat.id)
       const amount = entry.personal_amount ?? entry.amount

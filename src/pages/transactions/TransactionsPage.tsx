@@ -16,16 +16,31 @@ import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns
 type TypeFilter = 'all' | 'expense' | 'income' | 'transfer'
 
 export function TransactionsPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const categoryParam = searchParams.get('category')
   const startFilter = searchParams.get('start')
   const endFilter = searchParams.get('end')
+  const monthParam = searchParams.get('month')
 
-  const [currentDate, setCurrentDate] = useState(() => {
+  const currentDate = useMemo(() => {
+    if (monthParam) {
+      const [y, m] = monthParam.split('-').map(Number)
+      return new Date(y, m - 1, 1)
+    }
     if (startFilter) return new Date(startFilter + 'T00:00:00')
     return new Date()
-  })
+  }, [monthParam, startFilter])
+
+  function setCurrentDate(updater: (d: Date) => Date) {
+    const next = updater(currentDate)
+    const val = format(next, 'yyyy-MM')
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('month', val)
+      return next
+    }, { replace: true })
+  }
 
   const [showFilters, setShowFilters] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
@@ -94,8 +109,11 @@ export function TransactionsPage() {
 
   function handleMonthSelect(value: string | null) {
     if (value == null) return
-    const [year, month] = value.split('-').map(Number)
-    setCurrentDate(new Date(year, month - 1, 1))
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('month', value)
+      return next
+    }, { replace: true })
   }
 
   function clearCategoryParam() {
@@ -260,6 +278,13 @@ export function TransactionsPage() {
         <div className="space-y-4">
           {groupedByDate.map(([date, txs]) => {
             const dayTotal = txs.reduce((sum, tx) => {
+              if (selectedAccount) {
+                return sum + tx.entries.filter(e => e.account_id === selectedAccount).reduce((s, e) => {
+                  if (['income', 'transfer_in', 'reimbursement'].includes(e.type)) return s + e.amount
+                  if (['expense', 'transfer_out'].includes(e.type)) return s - e.amount
+                  return s
+                }, 0)
+              }
               const main = tx.entries.find(e => e.type === 'expense' || e.type === 'income')
               if (!main) return sum
               const amount = main.personal_amount ?? main.amount
@@ -278,8 +303,22 @@ export function TransactionsPage() {
                     if (!mainEntry) return null
                     const cat = mainEntry.category
                     const isTransfer = tx.type === 'transfer'
-                    const isExpense = mainEntry.type === 'expense'
-                    const displayAmount = mainEntry.personal_amount ?? mainEntry.amount
+
+                    let displayAmount: number
+                    let isExpense: boolean
+                    if (selectedAccount) {
+                      const netForAccount = tx.entries.filter(e => e.account_id === selectedAccount).reduce((s, e) => {
+                        if (['income', 'transfer_in', 'reimbursement'].includes(e.type)) return s + e.amount
+                        if (['expense', 'transfer_out'].includes(e.type)) return s - e.amount
+                        return s
+                      }, 0)
+                      displayAmount = Math.abs(netForAccount)
+                      isExpense = netForAccount < 0
+                    } else {
+                      displayAmount = mainEntry.personal_amount ?? mainEntry.amount
+                      isExpense = mainEntry.type === 'expense'
+                    }
+
                     const Icon = isTransfer ? ArrowLeftRight : getCategoryIcon(cat?.icon)
 
                     return (
@@ -303,13 +342,17 @@ export function TransactionsPage() {
                                 {tx.type === 'split' && ` · Split (${formatCurrency(displayAmount)} yours)`}
                               </p>
                             </div>
-                            {!isTransfer && (
+                            {selectedAccount ? (
                               <CurrencyDisplay
                                 cents={displayAmount}
                                 type={isExpense ? 'expense' : 'income'}
                               />
-                            )}
-                            {isTransfer && (
+                            ) : !isTransfer ? (
+                              <CurrencyDisplay
+                                cents={displayAmount}
+                                type={isExpense ? 'expense' : 'income'}
+                              />
+                            ) : (
                               <CurrencyDisplay cents={tx.entries.filter(e => e.type === 'transfer_out').reduce((s, e) => s + e.amount, 0)} type="neutral" showSign={false} />
                             )}
                           </CardContent>

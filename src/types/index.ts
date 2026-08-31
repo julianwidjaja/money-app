@@ -1,4 +1,4 @@
-export type AccountType = 'cash' | 'bank' | 'credit_card' | 'savings' | 'investment' | 'other'
+export type AccountType = 'cash' | 'chequing' | 'credit_card' | 'savings' | 'investment' | 'other'
 export type CategoryType = 'income' | 'expense'
 export type EntryType = 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'reimbursement'
 export type GroupType = 'simple' | 'split' | 'transfer'
@@ -12,6 +12,11 @@ export interface Account {
   icon: string | null
   color: string | null
   initial_balance: number
+  interest_rate: number | null
+  interest_last_applied: string | null
+  credit_limit: number | null
+  statement_day: number | null
+  default_funding_account_id: string | null
   is_archived: boolean
   sort_order: number
   created_at: string

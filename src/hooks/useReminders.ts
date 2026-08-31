@@ -12,6 +12,7 @@ export interface Reminder {
   due_day: number
   next_due: string
   last_dismissed_at: string | null
+  is_auto: boolean
   is_active: boolean
   created_at: string
 }
@@ -94,6 +95,23 @@ export function useReminders() {
   async function getReminderDetails(reminder: Reminder): Promise<{ funded: FundingBreakdown[]; unfundedTotal: number }> {
     if (!reminder.account_id) return { funded: [], unfundedTotal: 0 }
 
+    const { data: ccAccount } = await supabase
+      .from('accounts')
+      .select('default_funding_account_id')
+      .eq('id', reminder.account_id)
+      .single()
+
+    const defaultFundingId = ccAccount?.default_funding_account_id || null
+    let defaultFundingName: string | null = null
+    if (defaultFundingId) {
+      const { data: dfAccount } = await supabase
+        .from('accounts')
+        .select('name')
+        .eq('id', defaultFundingId)
+        .single()
+      defaultFundingName = dfAccount?.name || null
+    }
+
     let query = supabase
       .from('transaction_entries')
       .select('amount, funding_account_id, account:accounts!transaction_entries_funding_account_id_fkey(name)')
@@ -112,14 +130,17 @@ export function useReminders() {
     let unfundedTotal = 0
 
     for (const entry of data) {
-      if (entry.funding_account_id && entry.account) {
-        const existing = fundedMap.get(entry.funding_account_id)
+      const fid = entry.funding_account_id || defaultFundingId
+      const fname = entry.funding_account_id ? entry.account?.name : defaultFundingName
+
+      if (fid && fname) {
+        const existing = fundedMap.get(fid)
         if (existing) {
           existing.total += entry.amount
         } else {
-          fundedMap.set(entry.funding_account_id, {
-            funding_account_id: entry.funding_account_id,
-            account_name: entry.account.name,
+          fundedMap.set(fid, {
+            funding_account_id: fid,
+            account_name: fname,
             total: entry.amount,
           })
         }
@@ -145,6 +166,46 @@ export function useReminders() {
     return (data || []) as ReminderHistoryItem[]
   }
 
+  async function updateReminder(id: string, updates: Partial<Pick<Reminder, 'title' | 'account_id' | 'frequency' | 'due_day'>>) {
+    if (!user) return
+    const reminder = reminders.find(r => r.id === id)
+    if (!reminder) return
+
+    const newFrequency = updates.frequency ?? reminder.frequency
+    const newDueDay = updates.due_day ?? reminder.due_day
+
+    let nextDue = reminder.next_due
+    if (updates.frequency !== undefined || updates.due_day !== undefined) {
+      const today = new Date()
+      const todayStr = format(today, 'yyyy-MM-dd')
+      let candidate: Date
+      if (newFrequency === 'weekly' || newFrequency === 'biweekly') {
+        const dayOfWeek = newDueDay
+        const currentDay = today.getDay() || 7
+        const diff = dayOfWeek - currentDay
+        candidate = new Date(today)
+        candidate.setDate(today.getDate() + (diff <= 0 ? diff + 7 : diff))
+      } else {
+        candidate = new Date(today.getFullYear(), today.getMonth(), newDueDay)
+        if (format(candidate, 'yyyy-MM-dd') <= todayStr) {
+          candidate = addMonths(candidate, 1)
+        }
+      }
+      nextDue = format(candidate, 'yyyy-MM-dd')
+    }
+
+    const { data, error } = await supabase
+      .from('reminders')
+      .update({ ...updates, next_due: nextDue })
+      .eq('id', id)
+      .select()
+      .single()
+    if (!error && data) {
+      setReminders(prev => prev.map(r => r.id === id ? data as Reminder : r).sort((a, b) => a.next_due.localeCompare(b.next_due)))
+    }
+    return { data, error }
+  }
+
   async function deleteReminder(id: string) {
     const { error } = await supabase
       .from('reminders')
@@ -154,7 +215,67 @@ export function useReminders() {
     return { error }
   }
 
-  return { reminders, dueReminders, loading, createReminder, dismissReminder, deleteReminder, getReminderDetails, getReminderHistory, refetch: fetchReminders }
+  return { reminders, dueReminders, loading, createReminder, updateReminder, dismissReminder, deleteReminder, getReminderDetails, getReminderHistory, refetch: fetchReminders }
+}
+
+function wrapDay(day: number): number {
+  if (day < 1) return day + 28
+  if (day > 28) return day - 28
+  return day
+}
+
+function computeFirstDueForDay(dueDay: number): string {
+  const today = new Date()
+  const todayStr = format(today, 'yyyy-MM-dd')
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const day = Math.min(dueDay, daysInMonth)
+  const thisMonth = new Date(year, month, day)
+  const thisMonthStr = format(thisMonth, 'yyyy-MM-dd')
+  if (thisMonthStr >= todayStr) return thisMonthStr
+  return format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
+}
+
+export async function createCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null }) {
+  if (!account.statement_day || !account.credit_limit) return
+
+  const preDay = wrapDay(account.statement_day - 3)
+  const postDay = wrapDay(account.statement_day + 1)
+
+  await supabase.from('reminders').insert([
+    {
+      user_id: account.user_id,
+      title: `Pay ${account.name} to 9%`,
+      account_id: account.id,
+      frequency: 'monthly',
+      due_day: preDay,
+      next_due: computeFirstDueForDay(preDay),
+      is_auto: true,
+    },
+    {
+      user_id: account.user_id,
+      title: `Pay remaining ${account.name}`,
+      account_id: account.id,
+      frequency: 'monthly',
+      due_day: postDay,
+      next_due: computeFirstDueForDay(postDay),
+      is_auto: true,
+    },
+  ])
+}
+
+export async function deleteCCReminders(accountId: string) {
+  await supabase
+    .from('reminders')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('is_auto', true)
+}
+
+export async function updateCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null }) {
+  await deleteCCReminders(account.id)
+  await createCCReminders(account)
 }
 
 function computeNextDue(currentDue: string, frequency: string): string {

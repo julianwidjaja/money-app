@@ -31,6 +31,8 @@ async function ensureProfile(userId: string, email?: string, meta?: Record<strin
   }
 }
 
+let seedingInProgress: Promise<Category[]> | null = null;
+
 async function loadCategories(
   userId: string,
   email?: string,
@@ -49,6 +51,22 @@ async function loadCategories(
     return deduplicateByName(data as Category[]);
   }
 
+  if (seedingInProgress) return seedingInProgress;
+  seedingInProgress = (async () => {
+    try {
+      return await seedCategories(userId, email, meta);
+    } finally {
+      seedingInProgress = null;
+    }
+  })();
+  return seedingInProgress;
+}
+
+async function seedCategories(
+  userId: string,
+  email?: string,
+  meta?: Record<string, unknown>,
+): Promise<Category[]> {
   await ensureProfile(userId, email, meta);
 
   const expenseRows = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({

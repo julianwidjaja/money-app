@@ -51,7 +51,7 @@ export function EditTransactionPage() {
   }
 
   function handleSuccess() {
-    navigate(`/transactions/${id}`)
+    navigate(`/transactions/${id}`, { replace: true })
   }
 
   if (tx.type === 'simple') {
