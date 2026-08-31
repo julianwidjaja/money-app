@@ -1,4 +1,4 @@
-export type AccountType = 'cash' | 'bank' | 'credit_card' | 'savings' | 'investment' | 'other'
+export type AccountType = 'cash' | 'chequing' | 'credit_card' | 'savings' | 'investment' | 'other'
 export type CategoryType = 'income' | 'expense'
 export type EntryType = 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'reimbursement'
 export type GroupType = 'simple' | 'split' | 'transfer'
