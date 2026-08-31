@@ -5,12 +5,13 @@ import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { getCategoryIcon } from '@/lib/icons'
-import { ListOrdered, ArrowLeftRight, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { ListOrdered, ArrowLeftRight, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react'
 import { startOfMonth, endOfMonth, format, addMonths, subMonths } from 'date-fns'
 
 type TypeFilter = 'all' | 'expense' | 'income' | 'transfer'
@@ -42,10 +43,41 @@ export function TransactionsPage() {
     }, { replace: true })
   }
 
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
-  const [selectedAccount, setSelectedAccount] = useState('')
-  const [selectedType, setSelectedType] = useState<TypeFilter>('all')
+  const searchQuery = searchParams.get('q') || ''
+  const selectedCategory = searchParams.get('fc') || ''
+  const selectedAccount = searchParams.get('fa') || ''
+  const selectedType = (searchParams.get('ft') || 'all') as TypeFilter
+  const [showFilters, setShowFilters] = useState(!!(selectedCategory || selectedAccount || selectedType !== 'all'))
+
+  function setSearchQuery(v: string) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v) p.set('q', v); else p.delete('q')
+      return p
+    }, { replace: true })
+  }
+
+  function setSelectedCategory(v: string) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v) p.set('fc', v); else p.delete('fc')
+      return p
+    }, { replace: true })
+  }
+  function setSelectedAccount(v: string) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v) p.set('fa', v); else p.delete('fa')
+      return p
+    }, { replace: true })
+  }
+  function setSelectedType(v: TypeFilter) {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (v !== 'all') p.set('ft', v); else p.delete('ft')
+      return p
+    }, { replace: true })
+  }
 
   const { categories, expenseCategories, incomeCategories } = useCategories()
   const { accounts } = useAccounts()
@@ -54,7 +86,18 @@ export function TransactionsPage() {
   const filterCategory = activeCategoryId ? categories.find(c => c.id === activeCategoryId) : null
   const allCategories = [...expenseCategories, ...incomeCategories]
 
+  const showAll = searchParams.get('all') === '1'
+
+  function toggleShowAll() {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (showAll) p.delete('all'); else p.set('all', '1')
+      return p
+    }, { replace: true })
+  }
+
   const dateRange = useMemo(() => {
+    if (showAll) return {}
     if (startFilter && endFilter) {
       return { startDate: startFilter, endDate: endFilter }
     }
@@ -62,7 +105,7 @@ export function TransactionsPage() {
       startDate: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
       endDate: format(endOfMonth(currentDate), 'yyyy-MM-dd'),
     }
-  }, [currentDate, startFilter, endFilter])
+  }, [currentDate, startFilter, endFilter, showAll])
 
   const fetchOptions = useMemo(() => ({
     ...dateRange,
@@ -73,14 +116,26 @@ export function TransactionsPage() {
   const { transactions, loading } = useTransactions(fetchOptions)
 
   const filteredTransactions = useMemo(() => {
-    if (selectedType === 'all') return transactions
-    return transactions.filter(tx => {
-      if (selectedType === 'transfer') return tx.type === 'transfer'
-      if (selectedType === 'expense') return tx.type === 'simple' && tx.entries.some(e => e.type === 'expense') || tx.type === 'split'
-      if (selectedType === 'income') return tx.type === 'simple' && tx.entries.some(e => e.type === 'income')
-      return true
-    })
-  }, [transactions, selectedType])
+    let result = transactions
+    if (selectedType !== 'all') {
+      result = result.filter(tx => {
+        if (selectedType === 'transfer') return tx.type === 'transfer'
+        if (selectedType === 'expense') return tx.type === 'simple' && tx.entries.some(e => e.type === 'expense') || tx.type === 'split'
+        if (selectedType === 'income') return tx.type === 'simple' && tx.entries.some(e => e.type === 'income')
+        return true
+      })
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(tx => {
+        const name = (tx.description || '').toLowerCase()
+        const entryNotes = tx.entries.map(e => (e.note || '').toLowerCase()).join(' ')
+        const catName = tx.entries.map(e => (e.category?.name || '').toLowerCase()).join(' ')
+        return name.includes(q) || entryNotes.includes(q) || catName.includes(q)
+      })
+    }
+    return result
+  }, [transactions, selectedType, searchQuery])
 
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, typeof filteredTransactions>()
@@ -120,12 +175,17 @@ export function TransactionsPage() {
     navigate(-1)
   }
 
-  const hasActiveFilters = selectedCategory || selectedAccount || selectedType !== 'all'
+  const hasActiveFilters = searchQuery || selectedCategory || selectedAccount || selectedType !== 'all'
 
   function clearAllFilters() {
-    setSelectedCategory('')
-    setSelectedAccount('')
-    setSelectedType('all')
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      p.delete('q')
+      p.delete('fc')
+      p.delete('fa')
+      p.delete('ft')
+      return p
+    }, { replace: true })
   }
 
   const hasDateFilter = !!(startFilter && endFilter)
@@ -168,28 +228,64 @@ export function TransactionsPage() {
 
       {!hasDateFilter && (
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
-            <SelectTrigger className="w-auto border-none shadow-none font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(o => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          {showAll ? (
+            <>
+              <div />
+              <Button variant="ghost" size="sm" className="font-medium" onClick={toggleShowAll}>
+                All Time
+              </Button>
+              <div />
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
+                <SelectTrigger className="w-auto border-none shadow-none font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </>
+          )}
         </div>
       )}
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search transactions..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="pl-8 text-sm"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        )}
+      </div>
 
       {/* Filter toggle */}
       {!categoryParam && (
         <div className="flex items-center gap-2">
+          <Button
+            variant={showAll ? 'default' : 'outline'}
+            size="sm"
+            className="text-xs"
+            onClick={toggleShowAll}
+          >
+            All
+          </Button>
           <Button
             variant={showFilters || hasActiveFilters ? 'default' : 'outline'}
             size="sm"
@@ -200,7 +296,7 @@ export function TransactionsPage() {
             Filters
             {hasActiveFilters && (
               <span className="ml-1 bg-primary-foreground/20 rounded-full px-1.5 text-[10px]">
-                {(selectedCategory ? 1 : 0) + (selectedAccount ? 1 : 0) + (selectedType !== 'all' ? 1 : 0)}
+                {(searchQuery ? 1 : 0) + (selectedCategory ? 1 : 0) + (selectedAccount ? 1 : 0) + (selectedType !== 'all' ? 1 : 0)}
               </span>
             )}
           </Button>
