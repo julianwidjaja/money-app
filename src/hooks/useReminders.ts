@@ -95,6 +95,23 @@ export function useReminders() {
   async function getReminderDetails(reminder: Reminder): Promise<{ funded: FundingBreakdown[]; unfundedTotal: number }> {
     if (!reminder.account_id) return { funded: [], unfundedTotal: 0 }
 
+    const { data: ccAccount } = await supabase
+      .from('accounts')
+      .select('default_funding_account_id')
+      .eq('id', reminder.account_id)
+      .single()
+
+    const defaultFundingId = ccAccount?.default_funding_account_id || null
+    let defaultFundingName: string | null = null
+    if (defaultFundingId) {
+      const { data: dfAccount } = await supabase
+        .from('accounts')
+        .select('name')
+        .eq('id', defaultFundingId)
+        .single()
+      defaultFundingName = dfAccount?.name || null
+    }
+
     let query = supabase
       .from('transaction_entries')
       .select('amount, funding_account_id, account:accounts!transaction_entries_funding_account_id_fkey(name)')
@@ -113,14 +130,17 @@ export function useReminders() {
     let unfundedTotal = 0
 
     for (const entry of data) {
-      if (entry.funding_account_id && entry.account) {
-        const existing = fundedMap.get(entry.funding_account_id)
+      const fid = entry.funding_account_id || defaultFundingId
+      const fname = entry.funding_account_id ? entry.account?.name : defaultFundingName
+
+      if (fid && fname) {
+        const existing = fundedMap.get(fid)
         if (existing) {
           existing.total += entry.amount
         } else {
-          fundedMap.set(entry.funding_account_id, {
-            funding_account_id: entry.funding_account_id,
-            account_name: entry.account.name,
+          fundedMap.set(fid, {
+            funding_account_id: fid,
+            account_name: fname,
             total: entry.amount,
           })
         }

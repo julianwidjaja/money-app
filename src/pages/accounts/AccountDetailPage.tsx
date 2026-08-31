@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAccounts } from '@/hooks/useAccounts'
+import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -164,6 +164,54 @@ export function AccountDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* CC Funding Breakdown */}
+      {account.type === 'credit_card' && transactions.length > 0 && (() => {
+        const fundingMap = new Map<string, { name: string; total: number }>()
+        let unfunded = 0
+        const defaultFundingName = account.default_funding_account_id
+          ? accounts.find(a => a.id === account.default_funding_account_id)?.name
+          : null
+
+        for (const tx of transactions) {
+          for (const e of tx.entries.filter(e => e.account_id === id && e.type === 'expense')) {
+            const fid = (e as any).funding_account_id || account.default_funding_account_id
+            if (fid) {
+              const existing = fundingMap.get(fid)
+              const fname = (e as any).funding_account?.name
+                || (fid === account.default_funding_account_id ? defaultFundingName : null)
+                || accounts.find(a => a.id === fid)?.name
+                || 'Unknown'
+              if (existing) { existing.total += e.amount }
+              else { fundingMap.set(fid, { name: fname, total: e.amount }) }
+            } else {
+              unfunded += e.amount
+            }
+          }
+        }
+
+        if (fundingMap.size === 0 && unfunded === 0) return null
+
+        return (
+          <Card>
+            <CardContent className="py-3 px-4 space-y-2">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Funded By</h3>
+              {Array.from(fundingMap.values()).sort((a, b) => b.total - a.total).map(f => (
+                <div key={f.name} className="flex justify-between text-sm">
+                  <span>{f.name}</span>
+                  <span>{formatCurrency(f.total)}</span>
+                </div>
+              ))}
+              {unfunded > 0 && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Unfunded</span>
+                  <span>{formatCurrency(unfunded)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Transactions</h2>
 
