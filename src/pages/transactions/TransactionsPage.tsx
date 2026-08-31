@@ -86,7 +86,18 @@ export function TransactionsPage() {
   const filterCategory = activeCategoryId ? categories.find(c => c.id === activeCategoryId) : null
   const allCategories = [...expenseCategories, ...incomeCategories]
 
+  const showAll = searchParams.get('all') === '1'
+
+  function toggleShowAll() {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev)
+      if (showAll) p.delete('all'); else p.set('all', '1')
+      return p
+    }, { replace: true })
+  }
+
   const dateRange = useMemo(() => {
+    if (showAll) return {}
     if (startFilter && endFilter) {
       return { startDate: startFilter, endDate: endFilter }
     }
@@ -94,7 +105,7 @@ export function TransactionsPage() {
       startDate: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
       endDate: format(endOfMonth(currentDate), 'yyyy-MM-dd'),
     }
-  }, [currentDate, startFilter, endFilter])
+  }, [currentDate, startFilter, endFilter, showAll])
 
   const fetchOptions = useMemo(() => ({
     ...dateRange,
@@ -217,22 +228,34 @@ export function TransactionsPage() {
 
       {!hasDateFilter && (
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
-            <SelectTrigger className="w-auto border-none shadow-none font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(o => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          {showAll ? (
+            <>
+              <div />
+              <Button variant="ghost" size="sm" className="font-medium" onClick={toggleShowAll}>
+                All Time
+              </Button>
+              <div />
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Select value={currentMonthValue} onValueChange={handleMonthSelect} items={monthOptions}>
+                <SelectTrigger className="w-auto border-none shadow-none font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </>
+          )}
         </div>
       )}
 
@@ -255,6 +278,14 @@ export function TransactionsPage() {
       {/* Filter toggle */}
       {!categoryParam && (
         <div className="flex items-center gap-2">
+          <Button
+            variant={showAll ? 'default' : 'outline'}
+            size="sm"
+            className="text-xs"
+            onClick={toggleShowAll}
+          >
+            All
+          </Button>
           <Button
             variant={showFilters || hasActiveFilters ? 'default' : 'outline'}
             size="sm"
