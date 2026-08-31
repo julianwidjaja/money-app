@@ -14,12 +14,12 @@ import { formatCurrency } from '@/lib/utils'
 import { RECURRENCE_LABELS } from '@/lib/constants'
 import { getCategoryIcon } from '@/lib/icons'
 import { toast } from 'sonner'
-import { Repeat, Plus, Trash2 } from 'lucide-react'
+import { Repeat, Plus, Trash2, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
-import type { EntryType, RecurrenceFrequency } from '@/types'
+import type { EntryType, RecurrenceFrequency, RecurringRule } from '@/types'
 
 export function RecurringSettingsPage() {
-  const { rules, loading, createRule, deleteRule } = useRecurring()
+  const { rules, loading, createRule, updateRule, deleteRule } = useRecurring()
   const { accounts } = useAccounts()
   const { expenseCategories, incomeCategories } = useCategories()
 
@@ -33,7 +33,28 @@ export function RecurringSettingsPage() {
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [editOpen, setEditOpen] = useState(false)
+  const [editRule, setEditRule] = useState<RecurringRule | null>(null)
+  const [editTxType, setEditTxType] = useState<'expense' | 'income'>('expense')
+  const [editAmount, setEditAmount] = useState(0)
+  const [editAccountId, setEditAccountId] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState('')
+  const [editFrequency, setEditFrequency] = useState<RecurrenceFrequency>('monthly')
+  const [editDescription, setEditDescription] = useState('')
+
   const categories = txType === 'expense' ? expenseCategories : incomeCategories
+  const editCategories = editTxType === 'expense' ? expenseCategories : incomeCategories
+
+  function openEditDialog(rule: RecurringRule) {
+    setEditRule(rule)
+    setEditTxType(rule.template_type as 'expense' | 'income')
+    setEditAmount(rule.template_amount)
+    setEditAccountId(rule.template_account_id)
+    setEditCategoryId(rule.template_category_id || '')
+    setEditFrequency(rule.frequency)
+    setEditDescription(rule.template_description || '')
+    setEditOpen(true)
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -64,10 +85,118 @@ export function RecurringSettingsPage() {
     }
   }
 
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editRule) return
+    if (editAmount <= 0) { toast.error('Enter an amount'); return }
+    if (!editAccountId) { toast.error('Select an account'); return }
+    if (!editCategoryId) { toast.error('Select a category'); return }
+
+    setSaving(true)
+    const result = await updateRule(editRule.id, {
+      frequency: editFrequency,
+      template_description: editDescription || null,
+      template_account_id: editAccountId,
+      template_category_id: editCategoryId,
+      template_type: editTxType as EntryType,
+      template_amount: editAmount,
+    })
+    setSaving(false)
+
+    if (result?.error) toast.error('Failed to update rule')
+    else {
+      toast.success('Rule updated — future transactions will use the new settings')
+      setEditOpen(false)
+    }
+  }
+
   async function handleDelete(id: string) {
     const { error } = await deleteRule(id)
     if (error) toast.error('Failed to delete')
     else toast.success('Recurring rule removed')
+  }
+
+  function renderForm(
+    mode: 'create' | 'edit',
+    onSubmit: (e: React.FormEvent) => void,
+    type: 'expense' | 'income', setType: (v: 'expense' | 'income') => void,
+    amt: number, setAmt: (v: number) => void,
+    accId: string, setAccId: (v: string) => void,
+    catId: string, setCatId: (v: string) => void,
+    freq: RecurrenceFrequency, setFreq: (v: RecurrenceFrequency) => void,
+    desc: string, setDesc: (v: string) => void,
+    cats: typeof expenseCategories,
+  ) {
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Type</Label>
+          <Select value={type} onValueChange={(v) => v != null && setType(v as 'expense' | 'income')} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Expense</SelectItem>
+              <SelectItem value="income">Income</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Amount</Label>
+          <AmountInput value={amt} onChange={setAmt} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Account</Label>
+          <Select value={accId} onValueChange={(v) => v != null && setAccId(v)} items={accounts.map(a => ({ value: a.id, label: a.name }))}>
+            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectContent>
+              {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Category</Label>
+          <Select value={catId} onValueChange={(v) => v != null && setCatId(v)} items={cats.map(c => ({ value: c.id, label: c.name }))}>
+            <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+            <SelectContent>
+              {cats.map(c => {
+                const Icon = getCategoryIcon(c.icon)
+                return (
+                  <SelectItem key={c.id} value={c.id}>
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-4 h-4" style={{ color: c.color }} />
+                      {c.name}
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Frequency</Label>
+          <Select value={freq} onValueChange={(v) => v != null && setFreq(v as RecurrenceFrequency)} items={Object.entries(RECURRENCE_LABELS).map(([value, label]) => ({ value, label }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {mode === 'create' && (
+          <div className="space-y-1.5">
+            <Label>Start Date</Label>
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+        )}
+        <div className="space-y-1.5">
+          <Label>Description (optional)</Label>
+          <Input placeholder="e.g. Monthly rent" value={desc} onChange={e => setDesc(e.target.value)} />
+        </div>
+        <Button type="submit" className="w-full" disabled={saving}>
+          {saving ? 'Saving...' : mode === 'create' ? 'Create Rule' : 'Save Changes'}
+        </Button>
+      </form>
+    )
   }
 
   return (
@@ -80,72 +209,7 @@ export function RecurringSettingsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New Recurring Transaction</DialogTitle></DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Type</Label>
-                <Select value={txType} onValueChange={(v) => v != null && setTxType(v as 'expense' | 'income')} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="expense">Expense</SelectItem>
-                    <SelectItem value="income">Income</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Amount</Label>
-                <AmountInput value={amount} onChange={setAmount} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Account</Label>
-                <Select value={accountId} onValueChange={(v) => v != null && setAccountId(v)} items={accounts.map(a => ({ value: a.id, label: a.name }))}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={categoryId} onValueChange={(v) => v != null && setCategoryId(v)} items={categories.map(c => ({ value: c.id, label: c.name }))}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => {
-                      const Icon = getCategoryIcon(c.icon)
-                      return (
-                        <SelectItem key={c.id} value={c.id}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="w-4 h-4" style={{ color: c.color }} />
-                            {c.name}
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Frequency</Label>
-                <Select value={frequency} onValueChange={(v) => v != null && setFrequency(v as RecurrenceFrequency)} items={Object.entries(RECURRENCE_LABELS).map(([value, label]) => ({ value, label }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Start Date</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Description (optional)</Label>
-                <Input placeholder="e.g. Monthly rent" value={description} onChange={e => setDescription(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={saving}>
-                {saving ? 'Creating...' : 'Create Rule'}
-              </Button>
-            </form>
+            {renderForm('create', handleCreate, txType, setTxType, amount, setAmount, accountId, setAccountId, categoryId, setCategoryId, frequency, setFrequency, description, setDescription, categories)}
           </DialogContent>
         </Dialog>
       </div>
@@ -171,6 +235,9 @@ export function RecurringSettingsPage() {
                     {formatCurrency(r.template_amount)} · {RECURRENCE_LABELS[r.frequency]}
                   </p>
                 </div>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditDialog(r)}>
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(r.id)}>
                   <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
                 </Button>
@@ -179,6 +246,14 @@ export function RecurringSettingsPage() {
           ))}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Recurring Transaction</DialogTitle></DialogHeader>
+          {renderForm('edit', handleEdit, editTxType, setEditTxType, editAmount, setEditAmount, editAccountId, setEditAccountId, editCategoryId, setEditCategoryId, editFrequency, setEditFrequency, editDescription, setEditDescription, editCategories)}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

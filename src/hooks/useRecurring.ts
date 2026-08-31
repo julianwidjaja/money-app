@@ -34,6 +34,18 @@ export function useRecurring() {
     return { data, error }
   }
 
+  async function updateRule(id: string, updates: Partial<RecurringRule>) {
+    if (!user) return
+    const { data, error } = await supabase
+      .from('recurring_rules')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (!error && data) setRules(prev => prev.map(r => r.id === id ? data as RecurringRule : r))
+    return { data, error }
+  }
+
   async function deleteRule(id: string) {
     const { error } = await supabase
       .from('recurring_rules')
@@ -108,7 +120,7 @@ export function useRecurring() {
     await fetchRules()
   }
 
-  return { rules, loading, createRule, deleteRule, generatePendingTransactions, refetch: fetchRules }
+  return { rules, loading, createRule, updateRule, deleteRule, generatePendingTransactions, refetch: fetchRules }
 }
 
 function getNextDate(from: Date, frequency: string, interval: number): Date {

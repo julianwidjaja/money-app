@@ -16,7 +16,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
-import { Bell, Plus, Trash2, ArrowRight, History } from 'lucide-react'
+import { Bell, Plus, Trash2, Pencil, ArrowRight, History, ChevronDown } from 'lucide-react'
 import { format, addMonths, addYears } from 'date-fns'
 import type { FundingBreakdown, ReminderHistoryItem } from '@/hooks/useReminders'
 
@@ -28,7 +28,7 @@ const frequencyItems = [
 ]
 
 export function RemindersPage() {
-  const { reminders, loading, createReminder, deleteReminder } = useReminders()
+  const { reminders, loading, createReminder, updateReminder, deleteReminder } = useReminders()
   const { accounts } = useAccounts()
   const { user } = useAuth()
 
@@ -39,8 +39,16 @@ export function RemindersPage() {
   const [dueDay, setDueDay] = useState(1)
   const [saving, setSaving] = useState(false)
 
+  const [editOpen, setEditOpen] = useState(false)
+  const [editId, setEditId] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editAccountId, setEditAccountId] = useState('')
+  const [editFrequency, setEditFrequency] = useState('monthly')
+  const [editDueDay, setEditDueDay] = useState(1)
+
   const [history, setHistory] = useState<(ReminderHistoryItem & { reminder_title?: string })[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set())
 
   const accountItems = [{ value: 'none', label: 'No account' }, ...accounts.map(a => ({ value: a.id, label: a.name }))]
 
@@ -125,6 +133,35 @@ export function RemindersPage() {
     const { error } = await deleteReminder(id)
     if (error) toast.error('Failed to delete')
     else toast.success('Reminder deleted')
+  }
+
+  function openEdit(id: string) {
+    const r = reminders.find(rem => rem.id === id)
+    if (!r) return
+    setEditId(r.id)
+    setEditTitle(r.title)
+    setEditAccountId(r.account_id || 'none')
+    setEditFrequency(r.frequency)
+    setEditDueDay(r.due_day)
+    setEditOpen(true)
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editTitle.trim()) { toast.error('Enter a title'); return }
+    setSaving(true)
+    const result = await updateReminder(editId, {
+      title: editTitle.trim(),
+      account_id: editAccountId && editAccountId !== 'none' ? editAccountId : null,
+      frequency: editFrequency,
+      due_day: editDueDay,
+    })
+    setSaving(false)
+    if (result?.error) toast.error('Failed to update reminder')
+    else {
+      toast.success('Reminder updated')
+      setEditOpen(false)
+    }
   }
 
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -214,6 +251,9 @@ export function RemindersPage() {
                       {account && ` · ${account.name}`}
                     </p>
                   </div>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(r.id)}>
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                  </Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(r.id)}>
                     <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
                   </Button>
@@ -234,9 +274,19 @@ export function RemindersPage() {
             {history.map(h => {
               const hTotal = (h.funded || []).reduce((s: number, f: FundingBreakdown) => s + f.total, 0) + (h.unfunded_total || 0)
               const hasFunding = (h.funded || []).length > 0
+              const isExpanded = expandedHistory.has(h.id)
 
               return (
-                <Card key={h.id} className="opacity-80">
+                <Card
+                  key={h.id}
+                  className="opacity-80 cursor-pointer hover:opacity-100 transition-opacity"
+                  onClick={() => setExpandedHistory(prev => {
+                    const next = new Set(prev)
+                    if (next.has(h.id)) next.delete(h.id)
+                    else next.add(h.id)
+                    return next
+                  })}
+                >
                   <CardContent className="py-3 px-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -245,12 +295,15 @@ export function RemindersPage() {
                           Paid {formatDate(h.period_end, 'long')}
                         </p>
                       </div>
-                      {hTotal > 0 && (
-                        <CurrencyDisplay cents={hTotal} type="expense" showSign={false} className="text-sm font-medium" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        {hTotal > 0 && (
+                          <CurrencyDisplay cents={hTotal} type="expense" showSign={false} className="text-sm font-medium" />
+                        )}
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
                     </div>
 
-                    {hasFunding && (
+                    {isExpanded && hasFunding && (
                       <>
                         <Separator />
                         <div className="space-y-1.5">
@@ -272,6 +325,13 @@ export function RemindersPage() {
                         </div>
                       </>
                     )}
+
+                    {isExpanded && !hasFunding && (
+                      <>
+                        <Separator />
+                        <p className="text-xs text-muted-foreground">No funding breakdown recorded</p>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )
@@ -279,6 +339,57 @@ export function RemindersPage() {
           </div>
         </div>
       )}
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Reminder</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Title</Label>
+              <Input value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Linked Account (optional)</Label>
+              <Select value={editAccountId || 'none'} onValueChange={(v) => v != null && setEditAccountId(v)} items={accountItems}>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No account</SelectItem>
+                  {accounts.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Frequency</Label>
+              <Select value={editFrequency} onValueChange={(v) => v != null && setEditFrequency(v)} items={frequencyItems}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {frequencyItems.map(f => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                {editFrequency === 'weekly' || editFrequency === 'biweekly' ? 'Day of Week (1=Mon, 7=Sun)' : 'Day of Month'}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={editFrequency === 'weekly' || editFrequency === 'biweekly' ? 7 : 31}
+                value={editDueDay}
+                onChange={e => setEditDueDay(parseInt(e.target.value) || 1)}
+                className="text-sm"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

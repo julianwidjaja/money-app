@@ -145,6 +145,46 @@ export function useReminders() {
     return (data || []) as ReminderHistoryItem[]
   }
 
+  async function updateReminder(id: string, updates: Partial<Pick<Reminder, 'title' | 'account_id' | 'frequency' | 'due_day'>>) {
+    if (!user) return
+    const reminder = reminders.find(r => r.id === id)
+    if (!reminder) return
+
+    const newFrequency = updates.frequency ?? reminder.frequency
+    const newDueDay = updates.due_day ?? reminder.due_day
+
+    let nextDue = reminder.next_due
+    if (updates.frequency !== undefined || updates.due_day !== undefined) {
+      const today = new Date()
+      const todayStr = format(today, 'yyyy-MM-dd')
+      let candidate: Date
+      if (newFrequency === 'weekly' || newFrequency === 'biweekly') {
+        const dayOfWeek = newDueDay
+        const currentDay = today.getDay() || 7
+        const diff = dayOfWeek - currentDay
+        candidate = new Date(today)
+        candidate.setDate(today.getDate() + (diff <= 0 ? diff + 7 : diff))
+      } else {
+        candidate = new Date(today.getFullYear(), today.getMonth(), newDueDay)
+        if (format(candidate, 'yyyy-MM-dd') <= todayStr) {
+          candidate = addMonths(candidate, 1)
+        }
+      }
+      nextDue = format(candidate, 'yyyy-MM-dd')
+    }
+
+    const { data, error } = await supabase
+      .from('reminders')
+      .update({ ...updates, next_due: nextDue })
+      .eq('id', id)
+      .select()
+      .single()
+    if (!error && data) {
+      setReminders(prev => prev.map(r => r.id === id ? data as Reminder : r).sort((a, b) => a.next_due.localeCompare(b.next_due)))
+    }
+    return { data, error }
+  }
+
   async function deleteReminder(id: string) {
     const { error } = await supabase
       .from('reminders')
@@ -154,7 +194,7 @@ export function useReminders() {
     return { error }
   }
 
-  return { reminders, dueReminders, loading, createReminder, dismissReminder, deleteReminder, getReminderDetails, getReminderHistory, refetch: fetchReminders }
+  return { reminders, dueReminders, loading, createReminder, updateReminder, dismissReminder, deleteReminder, getReminderDetails, getReminderHistory, refetch: fetchReminders }
 }
 
 function computeNextDue(currentDue: string, frequency: string): string {
