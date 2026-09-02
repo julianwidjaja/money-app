@@ -201,6 +201,7 @@ export interface Database {
           last_generated_date: string | null
           template_description: string | null
           template_account_id: string
+          template_destination_account_id: string | null
           template_category_id: string | null
           template_type: 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'reimbursement'
           template_amount: number
@@ -217,6 +218,7 @@ export interface Database {
           last_generated_date?: string | null
           template_description?: string | null
           template_account_id: string
+          template_destination_account_id?: string | null
           template_category_id?: string | null
           template_type: 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'reimbursement'
           template_amount: number
@@ -231,6 +233,7 @@ export interface Database {
           last_generated_date?: string | null
           template_description?: string | null
           template_account_id?: string
+          template_destination_account_id?: string | null
           template_category_id?: string | null
           template_type?: 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'reimbursement'
           template_amount?: number

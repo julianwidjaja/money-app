@@ -84,11 +84,12 @@ export function useRecurring() {
 
         const dateStr = nextDate.toISOString().split('T')[0]
 
+        const isTransfer = rule.template_type === 'transfer_out' && !!rule.template_destination_account_id
         const { data: group } = await supabase
           .from('transaction_groups')
           .insert({
             user_id: user.id,
-            type: 'simple',
+            type: isTransfer ? 'transfer' : 'simple',
             description: rule.template_description,
             date: dateStr,
             recurring_rule_id: rule.id,
@@ -97,15 +98,22 @@ export function useRecurring() {
           .single()
 
         if (group) {
-          await supabase.from('transaction_entries').insert({
+          const entries = isTransfer && rule.template_destination_account_id
+            ? [
+                { account_id: rule.template_account_id, type: 'transfer_out' as const },
+                { account_id: rule.template_destination_account_id, type: 'transfer_in' as const },
+              ]
+            : [{ account_id: rule.template_account_id, type: rule.template_type }]
+
+          await supabase.from('transaction_entries').insert(entries.map(entry => ({
             group_id: group.id,
             user_id: user.id,
-            account_id: rule.template_account_id,
-            category_id: rule.template_category_id,
-            type: rule.template_type,
+            account_id: entry.account_id,
+            category_id: isTransfer ? null : rule.template_category_id,
+            type: entry.type,
             amount: rule.template_amount,
-            is_personal_expense: rule.template_type === 'expense',
-          })
+            is_personal_expense: entry.type === 'expense',
+          })))
         }
 
         await supabase

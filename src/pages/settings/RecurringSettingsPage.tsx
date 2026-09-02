@@ -55,9 +55,10 @@ export function RecurringSettingsPage() {
   const { expenseCategories, incomeCategories } = useCategories()
 
   const [open, setOpen] = useState(false)
-  const [txType, setTxType] = useState<'expense' | 'income'>('expense')
+  const [txType, setTxType] = useState<'expense' | 'income' | 'transfer_out'>('expense')
   const [amount, setAmount] = useState(0)
   const [accountId, setAccountId] = useState('')
+  const [destinationAccountId, setDestinationAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly')
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -66,9 +67,10 @@ export function RecurringSettingsPage() {
 
   const [editOpen, setEditOpen] = useState(false)
   const [editRule, setEditRule] = useState<RecurringRule | null>(null)
-  const [editTxType, setEditTxType] = useState<'expense' | 'income'>('expense')
+  const [editTxType, setEditTxType] = useState<'expense' | 'income' | 'transfer_out'>('expense')
   const [editAmount, setEditAmount] = useState(0)
   const [editAccountId, setEditAccountId] = useState('')
+  const [editDestinationAccountId, setEditDestinationAccountId] = useState('')
   const [editCategoryId, setEditCategoryId] = useState('')
   const [editFrequency, setEditFrequency] = useState<RecurrenceFrequency>('monthly')
   const [editDueDay, setEditDueDay] = useState('1')
@@ -79,9 +81,10 @@ export function RecurringSettingsPage() {
 
   function openEditDialog(rule: RecurringRule) {
     setEditRule(rule)
-    setEditTxType(rule.template_type as 'expense' | 'income')
+    setEditTxType(rule.template_type as 'expense' | 'income' | 'transfer_out')
     setEditAmount(rule.template_amount)
     setEditAccountId(rule.template_account_id)
+    setEditDestinationAccountId(rule.template_destination_account_id || '')
     setEditCategoryId(rule.template_category_id || '')
     setEditFrequency(rule.frequency)
     setEditDueDay(String(extractDay(rule.last_generated_date || rule.start_date, rule.frequency)))
@@ -93,7 +96,9 @@ export function RecurringSettingsPage() {
     e.preventDefault()
     if (amount <= 0) { toast.error('Enter an amount'); return }
     if (!accountId) { toast.error('Select an account'); return }
-    if (!categoryId) { toast.error('Select a category'); return }
+    if (txType !== 'transfer_out' && !categoryId) { toast.error('Select a category'); return }
+    if (txType === 'transfer_out' && !destinationAccountId) { toast.error('Select destination account'); return }
+    if (txType === 'transfer_out' && accountId === destinationAccountId) { toast.error('Accounts must be different'); return }
 
     setSaving(true)
     const result = await createRule({
@@ -103,7 +108,8 @@ export function RecurringSettingsPage() {
       end_date: null,
       template_description: description || null,
       template_account_id: accountId,
-      template_category_id: categoryId,
+      template_destination_account_id: txType === 'transfer_out' ? destinationAccountId : null,
+      template_category_id: txType === 'transfer_out' ? null : categoryId,
       template_type: txType as EntryType,
       template_amount: amount,
     })
@@ -123,7 +129,9 @@ export function RecurringSettingsPage() {
     if (!editRule) return
     if (editAmount <= 0) { toast.error('Enter an amount'); return }
     if (!editAccountId) { toast.error('Select an account'); return }
-    if (!editCategoryId) { toast.error('Select a category'); return }
+    if (editTxType !== 'transfer_out' && !editCategoryId) { toast.error('Select a category'); return }
+    if (editTxType === 'transfer_out' && !editDestinationAccountId) { toast.error('Select destination account'); return }
+    if (editTxType === 'transfer_out' && editAccountId === editDestinationAccountId) { toast.error('Accounts must be different'); return }
 
     setSaving(true)
     const parsedDay = parseInt(editDueDay) || 1
@@ -134,7 +142,8 @@ export function RecurringSettingsPage() {
       last_generated_date: newStartDate,
       template_description: editDescription || null,
       template_account_id: editAccountId,
-      template_category_id: editCategoryId,
+      template_destination_account_id: editTxType === 'transfer_out' ? editDestinationAccountId : null,
+      template_category_id: editTxType === 'transfer_out' ? null : editCategoryId,
       template_type: editTxType as EntryType,
       template_amount: editAmount,
     })
@@ -156,9 +165,10 @@ export function RecurringSettingsPage() {
   function renderForm(
     mode: 'create' | 'edit',
     onSubmit: (e: React.FormEvent) => void,
-    type: 'expense' | 'income', setType: (v: 'expense' | 'income') => void,
+    type: 'expense' | 'income' | 'transfer_out', setType: (v: 'expense' | 'income' | 'transfer_out') => void,
     amt: number, setAmt: (v: number) => void,
     accId: string, setAccId: (v: string) => void,
+    destinationAccId: string, setDestinationAccId: (v: string) => void,
     catId: string, setCatId: (v: string) => void,
     freq: RecurrenceFrequency, setFreq: (v: RecurrenceFrequency) => void,
     dayOrDate: string, setDayOrDate: (v: string) => void,
@@ -169,11 +179,12 @@ export function RecurringSettingsPage() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label>Type</Label>
-          <Select value={type} onValueChange={(v) => v != null && setType(v as 'expense' | 'income')} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}>
+          <Select value={type} onValueChange={(v) => v != null && setType(v as 'expense' | 'income' | 'transfer_out')} items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }, { value: 'transfer_out', label: 'Transfer' }]}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="expense">Expense</SelectItem>
               <SelectItem value="income">Income</SelectItem>
+              <SelectItem value="transfer_out">Transfer</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -190,7 +201,15 @@ export function RecurringSettingsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
+        {type === 'transfer_out' ? (
+          <div className="space-y-1.5">
+            <Label>To Account</Label>
+            <Select value={destinationAccId} onValueChange={(v) => v != null && setDestinationAccId(v)} items={accounts.map(a => ({ value: a.id, label: a.name }))}>
+              <SelectTrigger><SelectValue placeholder="Select destination account" /></SelectTrigger>
+              <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        ) : <div className="space-y-1.5">
           <Label>Category</Label>
           <Select value={catId} onValueChange={(v) => v != null && setCatId(v)} items={cats.map(c => ({ value: c.id, label: c.name }))}>
             <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
@@ -208,7 +227,7 @@ export function RecurringSettingsPage() {
               })}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
         <div className="space-y-1.5">
           <Label>Frequency</Label>
           <Select value={freq} onValueChange={(v) => v != null && setFreq(v as RecurrenceFrequency)} items={Object.entries(RECURRENCE_LABELS).map(([value, label]) => ({ value, label }))}>
@@ -261,7 +280,7 @@ export function RecurringSettingsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New Recurring Transaction</DialogTitle></DialogHeader>
-            {renderForm('create', handleCreate, txType, setTxType, amount, setAmount, accountId, setAccountId, categoryId, setCategoryId, frequency, setFrequency, startDate, setStartDate, description, setDescription, categories)}
+            {renderForm('create', handleCreate, txType, setTxType, amount, setAmount, accountId, setAccountId, destinationAccountId, setDestinationAccountId, categoryId, setCategoryId, frequency, setFrequency, startDate, setStartDate, description, setDescription, categories)}
           </DialogContent>
         </Dialog>
       </div>
@@ -303,7 +322,7 @@ export function RecurringSettingsPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Recurring Transaction</DialogTitle></DialogHeader>
-          {renderForm('edit', handleEdit, editTxType, setEditTxType, editAmount, setEditAmount, editAccountId, setEditAccountId, editCategoryId, setEditCategoryId, editFrequency, setEditFrequency, editDueDay, setEditDueDay, editDescription, setEditDescription, editCategories)}
+          {renderForm('edit', handleEdit, editTxType, setEditTxType, editAmount, setEditAmount, editAccountId, setEditAccountId, editDestinationAccountId, setEditDestinationAccountId, editCategoryId, setEditCategoryId, editFrequency, setEditFrequency, editDueDay, setEditDueDay, editDescription, setEditDescription, editCategories)}
         </DialogContent>
       </Dialog>
     </div>

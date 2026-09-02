@@ -157,7 +157,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
       if (result?.error) toast.error('Failed to save transaction')
       else {
         if (isRecurring && !isEdit) {
-          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Split transaction', template_account_id: accountId, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
+          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Split transaction', template_account_id: accountId, template_destination_account_id: null, template_category_id: categoryId, template_type: 'expense' as EntryType, template_amount: amount })
         }
         toast.success(isEdit ? 'Transaction updated' : 'Expense added')
         onSuccess()
@@ -176,7 +176,7 @@ export function TransactionForm({ type, onSuccess, editData, shared, onSharedCha
       toast.error('Failed to save transaction')
     } else {
       if (isRecurring && !isEdit) {
-        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || null, template_account_id: accountId, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
+        await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || null, template_account_id: accountId, template_destination_account_id: null, template_category_id: categoryId, template_type: type as EntryType, template_amount: amount })
       }
       toast.success(isEdit ? 'Transaction updated' : `${type === 'expense' ? 'Expense' : 'Income'} added`)
       onSuccess()
