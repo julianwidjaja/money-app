@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
-import { useSettings } from '@/hooks/useSettings'
 import { createCCReminders, updateCCReminders, deleteCCReminders } from '@/hooks/useReminders'
 import { useBudgets } from '@/hooks/useBudgets'
 import { Card, CardContent } from '@/components/ui/card'
@@ -89,13 +88,10 @@ export function AccountsPage() {
   const { accounts, createAccount, updateAccount, deleteAccount, reorderAccounts } = useAccounts()
   const { balances, loading, refetch } = useAccountBalances(accounts.map(a => a.id))
 
-  const { isFeatureEnabled } = useSettings()
-
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [type, setType] = useState<AccountType | ''>('')
   const [initialBalance, setInitialBalance] = useState(0)
-  const [interestRate, setInterestRate] = useState('')
   const [creditLimit, setCreditLimit] = useState(0)
   const [statementDay, setStatementDay] = useState('')
   const [defaultFundingId, setDefaultFundingId] = useState('')
@@ -105,7 +101,6 @@ export function AccountsPage() {
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editType, setEditType] = useState<AccountType | ''>('')
-  const [editInterestRate, setEditInterestRate] = useState('')
   const [editCreditLimit, setEditCreditLimit] = useState(0)
   const [editStatementDay, setEditStatementDay] = useState('')
   const [editDefaultFundingId, setEditDefaultFundingId] = useState('')
@@ -167,11 +162,9 @@ export function AccountsPage() {
     if (!name.trim()) { toast.error('Enter account name'); return }
     if (!type) { toast.error('Select account type'); return }
     setSaving(true)
-    const parsedRate = interestRate ? parseFloat(interestRate) : null
     const parsedStmtDay = statementDay ? parseInt(statementDay) : null
     const result = await createAccount({
       name: name.trim(), type: type as AccountType, initial_balance: initialBalance,
-      interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null, interest_last_applied: null,
       credit_limit: type === 'credit_card' && creditLimit > 0 ? creditLimit : null,
       statement_day: type === 'credit_card' && parsedStmtDay && parsedStmtDay >= 1 && parsedStmtDay <= 31 ? parsedStmtDay : null,
       default_funding_account_id: type === 'credit_card' && defaultFundingId ? defaultFundingId : null,
@@ -184,7 +177,7 @@ export function AccountsPage() {
         await createCCReminders(result.data as Account)
       }
       toast.success('Account created')
-      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setInterestRate(''); setCreditLimit(0); setStatementDay(''); setDefaultFundingId(''); refetch()
+      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setCreditLimit(0); setStatementDay(''); setDefaultFundingId(''); refetch()
     }
   }
 
@@ -192,7 +185,6 @@ export function AccountsPage() {
     const account = accounts.find(a => a.id === accountId)
     if (!account) return
     setEditId(account.id); setEditName(account.name); setEditType(account.type)
-    setEditInterestRate(account.interest_rate != null ? String(account.interest_rate) : '')
     setEditCreditLimit(account.credit_limit ?? 0)
     setEditStatementDay(account.statement_day != null ? String(account.statement_day) : '')
     setEditDefaultFundingId(account.default_funding_account_id || '')
@@ -204,14 +196,12 @@ export function AccountsPage() {
     if (!editName.trim()) { toast.error('Enter account name'); return }
     if (!editType) { toast.error('Select account type'); return }
     setSaving(true)
-    const parsedRate = editInterestRate ? parseFloat(editInterestRate) : null
     const parsedStmtDay = editStatementDay ? parseInt(editStatementDay) : null
     const ccLimit = editType === 'credit_card' && editCreditLimit > 0 ? editCreditLimit : null
     const stmtDay = editType === 'credit_card' && parsedStmtDay && parsedStmtDay >= 1 && parsedStmtDay <= 31 ? parsedStmtDay : null
     const result = await updateAccount(editId, {
       name: editName.trim(),
       type: editType as AccountType,
-      interest_rate: parsedRate && parsedRate > 0 ? parsedRate : null,
       credit_limit: ccLimit,
       statement_day: stmtDay,
       default_funding_account_id: editType === 'credit_card' && editDefaultFundingId ? editDefaultFundingId : null,
@@ -290,12 +280,6 @@ export function AccountsPage() {
                     <Label>Current Balance</Label>
                     <AmountInput value={initialBalance} onChange={setInitialBalance} allowNegative />
                   </div>
-                  {isFeatureEnabled('feature_interest') && (type === 'savings' || type === 'chequing') && (
-                    <div className="space-y-1.5">
-                      <Label>Interest Rate (% per year)</Label>
-                      <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={interestRate} onChange={e => setInterestRate(e.target.value)} />
-                    </div>
-                  )}
                   {type === 'credit_card' && (
                     <>
                       <div className="space-y-1.5">
@@ -495,12 +479,6 @@ export function AccountsPage() {
                 </SelectContent>
               </Select>
             </div>
-            {isFeatureEnabled('feature_interest') && (editType === 'savings' || editType === 'chequing') && (
-              <div className="space-y-1.5">
-                <Label>Interest Rate (% per year)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="e.g. 4.5" value={editInterestRate} onChange={e => setEditInterestRate(e.target.value)} />
-              </div>
-            )}
             {editType === 'credit_card' && (
               <>
                 <div className="space-y-1.5">
