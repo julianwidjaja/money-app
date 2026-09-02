@@ -17,7 +17,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import { RECURRENCE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { Bell, Plus, Trash2, Pencil, ArrowRight, History, ChevronDown } from 'lucide-react'
-import { format, addMonths, addYears } from 'date-fns'
+import { format } from 'date-fns'
 import type { FundingBreakdown, ReminderHistoryItem } from '@/hooks/useReminders'
 
 const frequencyItems = [
@@ -25,6 +25,16 @@ const frequencyItems = [
   { value: 'biweekly', label: 'Every 2 Weeks' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
+]
+
+const weekdayItems = [
+  { value: '1', label: 'Monday' },
+  { value: '2', label: 'Tuesday' },
+  { value: '3', label: 'Wednesday' },
+  { value: '4', label: 'Thursday' },
+  { value: '5', label: 'Friday' },
+  { value: '6', label: 'Saturday' },
+  { value: '7', label: 'Sunday' },
 ]
 
 export function RemindersPage() {
@@ -36,7 +46,7 @@ export function RemindersPage() {
   const [title, setTitle] = useState('')
   const [accountId, setAccountId] = useState<string>('')
   const [frequency, setFrequency] = useState('monthly')
-  const [dueDay, setDueDay] = useState(1)
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [saving, setSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -45,6 +55,7 @@ export function RemindersPage() {
   const [editAccountId, setEditAccountId] = useState('')
   const [editFrequency, setEditFrequency] = useState('monthly')
   const [editDueDay, setEditDueDay] = useState(1)
+  const [editYearlyDate, setEditYearlyDate] = useState('')
 
   const [history, setHistory] = useState<(ReminderHistoryItem & { reminder_title?: string })[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -76,45 +87,23 @@ export function RemindersPage() {
     return () => { cancelled = true }
   }, [user])
 
-  function computeFirstDue(): string {
-    const today = new Date()
-    const todayStr = format(today, 'yyyy-MM-dd')
-
-    if (frequency === 'weekly' || frequency === 'biweekly') {
-      const currentDay = today.getDay() || 7
-      let diff = dueDay - currentDay
-      if (diff <= 0) diff += 7
-      const next = new Date(today)
-      next.setDate(next.getDate() + diff)
-      return format(next, 'yyyy-MM-dd')
-    }
-
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const day = Math.min(dueDay, daysInMonth)
-    const thisMonth = new Date(year, month, day)
-    const thisMonthStr = format(thisMonth, 'yyyy-MM-dd')
-
-    if (thisMonthStr >= todayStr) return thisMonthStr
-
-    if (frequency === 'yearly') {
-      return format(addYears(thisMonth, 1), 'yyyy-MM-dd')
-    }
-    return format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
-  }
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { toast.error('Enter a title'); return }
+    if (!startDate) { toast.error('Select a start date'); return }
     setSaving(true)
+
+    const date = new Date(`${startDate}T00:00:00`)
+    const dueDay = frequency === 'weekly' || frequency === 'biweekly'
+      ? (date.getDay() || 7)
+      : date.getDate()
 
     const result = await createReminder({
       title: title.trim(),
       account_id: accountId && accountId !== 'none' ? accountId : null,
       frequency,
       due_day: dueDay,
-      next_due: computeFirstDue(),
+      next_due: startDate,
     })
     setSaving(false)
 
@@ -125,7 +114,7 @@ export function RemindersPage() {
       setTitle('')
       setAccountId('')
       setFrequency('monthly')
-      setDueDay(1)
+      setStartDate(format(new Date(), 'yyyy-MM-dd'))
     }
   }
 
@@ -143,18 +132,23 @@ export function RemindersPage() {
     setEditAccountId(r.account_id || 'none')
     setEditFrequency(r.frequency)
     setEditDueDay(r.due_day)
+    setEditYearlyDate(`${new Date().getFullYear()}-${r.next_due.slice(5)}`)
     setEditOpen(true)
   }
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editTitle.trim()) { toast.error('Enter a title'); return }
+    if (editFrequency === 'yearly' && !editYearlyDate) { toast.error('Select a date'); return }
     setSaving(true)
     const result = await updateReminder(editId, {
       title: editTitle.trim(),
       account_id: editAccountId && editAccountId !== 'none' ? editAccountId : null,
       frequency: editFrequency,
-      due_day: editDueDay,
+      due_day: editFrequency === 'yearly'
+        ? new Date(`${editYearlyDate}T00:00:00`).getDate()
+        : editDueDay,
+      ...(editFrequency === 'yearly' ? { yearly_date: editYearlyDate } : {}),
     })
     setSaving(false)
     if (result?.error) toast.error('Failed to update reminder')
@@ -205,15 +199,11 @@ export function RemindersPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>
-                  {frequency === 'weekly' || frequency === 'biweekly' ? 'Day of Week (1=Mon, 7=Sun)' : 'Day of Month'}
-                </Label>
+                <Label>Start Date</Label>
                 <Input
-                  type="number"
-                  min={1}
-                  max={frequency === 'weekly' || frequency === 'biweekly' ? 7 : 31}
-                  value={dueDay}
-                  onChange={e => setDueDay(parseInt(e.target.value) || 1)}
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
                   className="text-sm"
                 />
               </div>
@@ -376,19 +366,39 @@ export function RemindersPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>
-                {editFrequency === 'weekly' || editFrequency === 'biweekly' ? 'Day of Week (1=Mon, 7=Sun)' : 'Day of Month'}
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                max={editFrequency === 'weekly' || editFrequency === 'biweekly' ? 7 : 31}
-                value={editDueDay}
-                onChange={e => setEditDueDay(parseInt(e.target.value) || 1)}
-                className="text-sm"
-              />
-            </div>
+            {editFrequency === 'yearly' ? (
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={editYearlyDate}
+                  onChange={e => setEditYearlyDate(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+            ) : editFrequency === 'weekly' || editFrequency === 'biweekly' ? (
+              <div className="space-y-1.5">
+                <Label>Day of Week</Label>
+                <Select value={String(editDueDay)} onValueChange={v => v != null && setEditDueDay(parseInt(v))} items={weekdayItems}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {weekdayItems.map(day => <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Day of Month</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={editDueDay}
+                  onChange={e => setEditDueDay(parseInt(e.target.value) || 1)}
+                  className="text-sm"
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>

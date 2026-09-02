@@ -12,8 +12,6 @@ export interface Account {
   icon: string | null
   color: string | null
   initial_balance: number
-  interest_rate: number | null
-  interest_last_applied: string | null
   credit_limit: number | null
   statement_day: number | null
   default_funding_account_id: string | null
