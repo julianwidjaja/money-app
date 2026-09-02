@@ -87,6 +87,7 @@ export interface RecurringRule {
   last_generated_date: string | null
   template_description: string | null
   template_account_id: string
+  template_destination_account_id: string | null
   template_category_id: string | null
   template_type: EntryType
   template_amount: number

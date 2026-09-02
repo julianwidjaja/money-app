@@ -59,6 +59,7 @@ create table recurring_rules (
   last_generated_date date,
   template_description text,
   template_account_id uuid not null references accounts(id),
+  template_destination_account_id uuid references accounts(id) on delete restrict,
   template_category_id uuid references categories(id),
   template_type entry_type not null,
   template_amount bigint not null,

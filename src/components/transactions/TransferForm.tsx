@@ -132,10 +132,10 @@ export function TransferForm({ onSuccess, editData, shared, onSharedChange }: Tr
     }
   }
 
-  function buildInput() {
+  function buildInput(destinationAmount?: number) {
     return {
       sources: sources.filter(s => s.amount > 0 && s.accountId).map(s => ({ accountId: s.accountId, amount: s.amount })),
-      destinations: destinations.filter(d => d.amount > 0 && d.accountId).map(d => ({ accountId: d.accountId, amount: d.amount })),
+      destinations: destinations.filter(d => (destinationAmount ?? d.amount) > 0 && d.accountId).map(d => ({ accountId: d.accountId, amount: destinationAmount ?? d.amount })),
       date,
       name: name || undefined,
       description: description || undefined,
@@ -184,20 +184,17 @@ export function TransferForm({ onSuccess, editData, shared, onSharedChange }: Tr
       if (!dest?.accountId) { toast.error('Select destination account'); return }
       if (source.accountId === dest.accountId) { toast.error('Accounts must be different'); return }
 
-      // sync destination amount to source for simple mode
-      dest.amount = source.amount
-
       setLoading(true)
       const result = isEdit
-        ? await updateTransfer(editData.groupId, buildInput())
-        : await createTransfer(buildInput())
+        ? await updateTransfer(editData.groupId, buildInput(source.amount))
+        : await createTransfer(buildInput(source.amount))
       setLoading(false)
 
       if (result?.error) {
         toast.error('Failed to save transfer')
       } else {
         if (isRecurring && !isEdit) {
-          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Transfer', template_account_id: source.accountId, template_category_id: null, template_type: 'transfer_out' as EntryType, template_amount: source.amount })
+          await createRule({ frequency, interval: 1, start_date: date, end_date: null, template_description: name || 'Transfer', template_account_id: source.accountId, template_destination_account_id: dest.accountId, template_category_id: null, template_type: 'transfer_out' as EntryType, template_amount: source.amount })
         }
         toast.success(isEdit ? 'Transfer updated' : 'Transfer added')
         onSuccess()
