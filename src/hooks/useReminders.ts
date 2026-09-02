@@ -166,11 +166,12 @@ export function useReminders() {
     return (data || []) as ReminderHistoryItem[]
   }
 
-  async function updateReminder(id: string, updates: Partial<Pick<Reminder, 'title' | 'account_id' | 'frequency' | 'due_day'>>) {
+  async function updateReminder(id: string, updates: Partial<Pick<Reminder, 'title' | 'account_id' | 'frequency' | 'due_day'>> & { yearly_date?: string }) {
     if (!user) return
     const reminder = reminders.find(r => r.id === id)
     if (!reminder) return
 
+    const { yearly_date: yearlyDate, ...databaseUpdates } = updates
     const newFrequency = updates.frequency ?? reminder.frequency
     const newDueDay = updates.due_day ?? reminder.due_day
 
@@ -185,10 +186,15 @@ export function useReminders() {
         const diff = dayOfWeek - currentDay
         candidate = new Date(today)
         candidate.setDate(today.getDate() + (diff <= 0 ? diff + 7 : diff))
+      } else if (newFrequency === 'yearly' && yearlyDate) {
+        const selected = new Date(`${yearlyDate}T00:00:00`)
+        candidate = new Date(today.getFullYear(), selected.getMonth(), selected.getDate())
+        if (format(candidate, 'yyyy-MM-dd') <= todayStr) candidate = addYears(candidate, 1)
       } else {
-        candidate = new Date(today.getFullYear(), today.getMonth(), newDueDay)
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+        candidate = new Date(today.getFullYear(), today.getMonth(), Math.min(newDueDay, daysInMonth))
         if (format(candidate, 'yyyy-MM-dd') <= todayStr) {
-          candidate = addMonths(candidate, 1)
+          candidate = newFrequency === 'yearly' ? addYears(candidate, 1) : addMonths(candidate, 1)
         }
       }
       nextDue = format(candidate, 'yyyy-MM-dd')
@@ -196,7 +202,7 @@ export function useReminders() {
 
     const { data, error } = await supabase
       .from('reminders')
-      .update({ ...updates, next_due: nextDue })
+      .update({ ...databaseUpdates, next_due: nextDue })
       .eq('id', id)
       .select()
       .single()
