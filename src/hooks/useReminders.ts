@@ -273,7 +273,7 @@ export async function createCCReminders(account: { id: string; user_id: string; 
   await supabase.from('reminders').insert([
     {
       user_id: account.user_id,
-      title: `Pay ${account.name} to 9%`,
+      title: `Pay ${account.name} to 5%`,
       account_id: account.id,
       frequency: 'monthly',
       due_day: preDay,
