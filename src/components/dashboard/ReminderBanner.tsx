@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { formatCurrency } from '@/lib/utils'
 import { Bell, Check, ChevronRight, ArrowRight } from 'lucide-react'
-import type { Reminder, FundingBreakdown } from '@/hooks/useReminders'
+import type { Reminder, FundingBreakdown, ReminderDetails } from '@/hooks/useReminders'
 import type { Account, AccountBalance } from '@/types'
 
 interface ReminderBannerProps {
@@ -15,16 +15,13 @@ interface ReminderBannerProps {
   accounts: Account[]
   balances: AccountBalance[]
   onDismiss: (id: string, details?: { funded: FundingBreakdown[]; unfundedTotal: number }) => void
-  onGetDetails: (reminder: Reminder) => Promise<{ funded: FundingBreakdown[]; unfundedTotal: number }>
+  onGetDetails: (reminder: Reminder) => Promise<ReminderDetails>
 }
 
 export function ReminderBanner({ reminders, accountNames, accounts, balances, onDismiss, onGetDetails }: ReminderBannerProps) {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
-  const [details, setDetails] = useState<{ funded: FundingBreakdown[]; unfundedTotal: number } | null>(null)
+  const [details, setDetails] = useState<ReminderDetails | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
-
-  if (reminders.length === 0) return null
-
   function getCCInfo(reminder: Reminder) {
     if (!reminder.is_auto || !reminder.account_id) return null
     const account = accounts.find(a => a.id === reminder.account_id)
@@ -39,10 +36,11 @@ export function ReminderBanner({ reminders, accountNames, accounts, balances, on
     if (isPreStatement) {
       const amountToPay = Math.max(0, currentOwed - target9pct)
       return { currentOwed, target9pct, amountToPay, creditLimit: account.credit_limit, isPreStatement: true }
-    } else {
-      return { currentOwed, target9pct, amountToPay: currentOwed, creditLimit: account.credit_limit, isPreStatement: false }
     }
+    return { currentOwed, target9pct, amountToPay: currentOwed, creditLimit: account.credit_limit, isPreStatement: false }
   }
+
+  if (reminders.length === 0) return null
 
   async function openDetails(reminder: Reminder) {
     setSelectedReminder(reminder)
@@ -120,7 +118,7 @@ export function ReminderBanner({ reminders, accountNames, accounts, balances, on
                 <Card>
                   <CardContent className="py-3 px-4 space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Current owed</span>
+                      <span className="text-muted-foreground">{selectedCCInfo.isPreStatement ? 'Current owed' : 'Statement balance'}</span>
                       <span>{formatCurrency(selectedCCInfo.currentOwed)}</span>
                     </div>
                     {selectedCCInfo.isPreStatement && (
@@ -154,7 +152,7 @@ export function ReminderBanner({ reminders, accountNames, accounts, balances, on
                   <div className="flex justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                   </div>
-                ) : details && (details.funded.length > 0 || details.unfundedTotal > 0) ? (
+                ) : details && (details.funded.length > 0 || details.unfundedTotal > 0 || selectedCCInfo) ? (
                   <>
                     <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Payment Breakdown</h3>
 
@@ -175,6 +173,7 @@ export function ReminderBanner({ reminders, accountNames, accounts, balances, on
                           <CurrencyDisplay cents={details.unfundedTotal} type="expense" showSign={false} />
                         </div>
                       )}
+
                     </div>
 
                     <Separator />
