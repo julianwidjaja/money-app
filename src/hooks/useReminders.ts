@@ -23,6 +23,11 @@ export interface FundingBreakdown {
   total: number
 }
 
+export interface ReminderDetails {
+  funded: FundingBreakdown[]
+  unfundedTotal: number
+}
+
 export interface ReminderHistoryItem {
   id: string
   period_start: string | null
@@ -92,12 +97,12 @@ export function useReminders() {
     }
   }
 
-  async function getReminderDetails(reminder: Reminder): Promise<{ funded: FundingBreakdown[]; unfundedTotal: number }> {
+  async function getReminderDetails(reminder: Reminder): Promise<ReminderDetails> {
     if (!reminder.account_id) return { funded: [], unfundedTotal: 0 }
 
     const { data: ccAccount } = await supabase
       .from('accounts')
-      .select('default_funding_account_id')
+      .select('default_funding_account_id, statement_day')
       .eq('id', reminder.account_id)
       .single()
 
@@ -114,15 +119,21 @@ export function useReminders() {
 
     let query = supabase
       .from('transaction_entries')
-      .select('amount, funding_account_id, account:accounts!transaction_entries_funding_account_id_fkey(name)')
+      .select('amount, type, funding_account_id, account:accounts!transaction_entries_funding_account_id_fkey(name), group:transaction_groups!inner(date)')
       .eq('account_id', reminder.account_id)
       .eq('type', 'expense')
 
-    if (reminder.last_dismissed_at) {
+    const isAutoCC = reminder.is_auto && ccAccount?.statement_day
+    if (isAutoCC) {
+      const previousStatementDate = getStatementDateForReminder(reminder.next_due, ccAccount.statement_day)
+      query = query
+        .gte('group.date', previousStatementDate)
+        .lte('group.date', reminder.next_due)
+    } else if (reminder.last_dismissed_at) {
       query = query.gte('created_at', reminder.last_dismissed_at)
     }
 
-    const { data } = await query as { data: { amount: number; funding_account_id: string | null; account: { name: string } | null }[] | null }
+    const { data } = await query as { data: { amount: number; funding_account_id: string | null; account: { name: string } | null; group: { date: string } }[] | null }
 
     if (!data) return { funded: [], unfundedTotal: 0 }
 
@@ -131,7 +142,9 @@ export function useReminders() {
 
     for (const entry of data) {
       const fid = entry.funding_account_id || defaultFundingId
-      const fname = entry.funding_account_id ? entry.account?.name : defaultFundingName
+      const fname = entry.funding_account_id
+        ? entry.account?.name || (fid === defaultFundingId ? defaultFundingName : null)
+        : defaultFundingName
 
       if (fid && fname) {
         const existing = fundedMap.get(fid)
@@ -230,6 +243,14 @@ function wrapDay(day: number): number {
   return day
 }
 
+function getStatementDateForReminder(nextDue: string, statementDay: number): string {
+  const dueDate = new Date(`${nextDue}T00:00:00`)
+  const statementMonth = statementDay <= dueDate.getDate() ? dueDate.getMonth() : dueDate.getMonth() - 1
+  const daysInMonth = new Date(dueDate.getFullYear(), statementMonth + 1, 0).getDate()
+  const date = new Date(dueDate.getFullYear(), statementMonth, Math.min(statementDay, daysInMonth))
+  return format(date, 'yyyy-MM-dd')
+}
+
 function computeFirstDueForDay(dueDay: number): string {
   const today = new Date()
   const todayStr = format(today, 'yyyy-MM-dd')
@@ -252,7 +273,7 @@ export async function createCCReminders(account: { id: string; user_id: string; 
   await supabase.from('reminders').insert([
     {
       user_id: account.user_id,
-      title: `Pay ${account.name} to 9%`,
+      title: `Pay ${account.name} to 5%`,
       account_id: account.id,
       frequency: 'monthly',
       due_day: preDay,
