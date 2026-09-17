@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { RecurringRule } from '@/types'
-import { addDays, addWeeks, addMonths, addYears, isAfter, isBefore, startOfDay } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, format, isAfter, isBefore, startOfDay } from 'date-fns'
 
 export function useRecurring() {
   const { user } = useAuth()
@@ -21,6 +21,7 @@ export function useRecurring() {
     setLoading(false)
   }, [user])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchRules() }, [fetchRules])
 
   async function createRule(rule: Omit<RecurringRule, 'id' | 'user_id' | 'created_at' | 'last_generated_date' | 'is_active'>) {
@@ -55,49 +56,77 @@ export function useRecurring() {
     return { error }
   }
 
-  async function generatePendingTransactions() {
-    if (!user) return
-    const today = startOfDay(new Date())
+  const generating = useRef(false)
 
-    const { data: freshRules } = await supabase
+  const generatePendingTransactions = useCallback(async () => {
+    if (!user || generating.current) return
+    generating.current = true
+
+    try {
+      const today = startOfDay(new Date())
+
+      const { data: freshRules, error: rulesError } = await supabase
       .from('recurring_rules')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    if (!freshRules || freshRules.length === 0) return
+      if (rulesError || !freshRules || freshRules.length === 0) return
 
-    for (const rule of freshRules) {
-      const lastGenerated = rule.last_generated_date
-        ? startOfDay(new Date(rule.last_generated_date + 'T00:00:00'))
-        : null
-      const startDate = startOfDay(new Date(rule.start_date + 'T00:00:00'))
-      const endDate = rule.end_date ? startOfDay(new Date(rule.end_date + 'T00:00:00')) : null
+      for (const rule of freshRules) {
+        const lastGenerated = rule.last_generated_date
+          ? startOfDay(new Date(rule.last_generated_date + 'T00:00:00'))
+          : null
+        const startDate = startOfDay(new Date(rule.start_date + 'T00:00:00'))
+        const endDate = rule.end_date ? startOfDay(new Date(rule.end_date + 'T00:00:00')) : null
 
-      if (endDate && isAfter(today, endDate)) continue
+        const interval = Math.max(1, Number(rule.interval) || 1)
+        // The recorded date is the occurrence the user created. Start with the
+        // following occurrence so deleting an old transaction is permanent.
+        let nextDate = lastGenerated ? getNextDate(lastGenerated, rule.frequency, interval) : startDate
+        if (isBefore(nextDate, startDate)) nextDate = startDate
 
-      let nextDate = lastGenerated ? getNextDate(lastGenerated, rule.frequency, rule.interval) : startDate
-      if (isBefore(nextDate, startDate)) nextDate = startDate
+        while (!isAfter(nextDate, today)) {
+          if (endDate && isAfter(nextDate, endDate)) break
 
-      while (!isAfter(nextDate, today)) {
-        if (endDate && isAfter(nextDate, endDate)) break
+          // Keep the user's local calendar date. toISOString() shifts local midnight
+          // to the previous day in time zones west of UTC.
+          const dateStr = format(nextDate, 'yyyy-MM-dd')
 
-        const dateStr = nextDate.toISOString().split('T')[0]
+          const { data: existingGroups, error: existingError } = await supabase
+            .from('transaction_groups')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('recurring_rule_id', rule.id)
+            .eq('date', dateStr)
+            .limit(1)
 
-        const isTransfer = rule.template_type === 'transfer_out' && !!rule.template_destination_account_id
-        const { data: group } = await supabase
-          .from('transaction_groups')
-          .insert({
-            user_id: user.id,
-            type: isTransfer ? 'transfer' : 'simple',
-            description: rule.template_description,
-            date: dateStr,
-            recurring_rule_id: rule.id,
-          })
-          .select()
-          .single()
+          if (existingError) break
 
-        if (group) {
+          if (existingGroups && existingGroups.length > 0) {
+            await supabase
+              .from('recurring_rules')
+              .update({ last_generated_date: dateStr })
+              .eq('id', rule.id)
+            nextDate = getNextDate(nextDate, rule.frequency, interval)
+            continue
+          }
+
+          const isTransfer = rule.template_type === 'transfer_out' && !!rule.template_destination_account_id
+          const { data: group, error: groupError } = await supabase
+            .from('transaction_groups')
+            .insert({
+              user_id: user.id,
+              type: isTransfer ? 'transfer' : 'simple',
+              description: rule.template_description,
+              date: dateStr,
+              recurring_rule_id: rule.id,
+            })
+            .select()
+            .single()
+
+          if (groupError || !group) break
+
           const entries = isTransfer && rule.template_destination_account_id
             ? [
                 { account_id: rule.template_account_id, type: 'transfer_out' as const },
@@ -105,7 +134,7 @@ export function useRecurring() {
               ]
             : [{ account_id: rule.template_account_id, type: rule.template_type }]
 
-          await supabase.from('transaction_entries').insert(entries.map(entry => ({
+          const { error: entriesError } = await supabase.from('transaction_entries').insert(entries.map(entry => ({
             group_id: group.id,
             user_id: user.id,
             account_id: entry.account_id,
@@ -114,19 +143,28 @@ export function useRecurring() {
             amount: rule.template_amount,
             is_personal_expense: entry.type === 'expense',
           })))
+
+          if (entriesError) {
+            // Do not leave an empty group that would make the date look generated
+            // on the next retry.
+            await supabase.from('transaction_groups').delete().eq('id', group.id)
+            break
+          }
+
+          await supabase
+            .from('recurring_rules')
+            .update({ last_generated_date: dateStr })
+            .eq('id', rule.id)
+
+          nextDate = getNextDate(nextDate, rule.frequency, interval)
         }
-
-        await supabase
-          .from('recurring_rules')
-          .update({ last_generated_date: dateStr })
-          .eq('id', rule.id)
-
-        nextDate = getNextDate(nextDate, rule.frequency, rule.interval)
       }
-    }
 
-    await fetchRules()
-  }
+      await fetchRules()
+    } finally {
+      generating.current = false
+    }
+  }, [fetchRules, user])
 
   return { rules, loading, createRule, updateRule, deleteRule, generatePendingTransactions, refetch: fetchRules }
 }
