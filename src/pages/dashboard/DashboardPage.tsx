@@ -1,19 +1,17 @@
-import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { useAccounts, useAccountBalances } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
-import { useRecurring } from '@/hooks/useRecurring'
 import { useCategorySpending } from '@/hooks/useCategorySpending'
 import { useReminders } from '@/hooks/useReminders'
 import { useSettings } from '@/hooks/useSettings'
 import { ReminderBanner } from '@/components/dashboard/ReminderBanner'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { CurrencyDisplay } from '@/components/common/CurrencyDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
-import { formatCurrency, formatDate, getYearMonth } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/constants'
 import { Wallet, ArrowRight, TrendingDown } from 'lucide-react'
 import { getCategoryIcon } from '@/lib/icons'
@@ -23,7 +21,6 @@ export function DashboardPage() {
   const { balances, loading: balancesLoading } = useAccountBalances(accounts.map(a => a.id))
   const { transactions, loading: txLoading } = useTransactions({ limit: 5 })
   const { budgetStatus } = useBudgets()
-  const { generatePendingTransactions } = useRecurring()
   const { dueReminders, dismissReminder, getReminderDetails } = useReminders()
   const { isFeatureEnabled } = useSettings()
 
@@ -33,10 +30,6 @@ export function DashboardPage() {
   const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`
   const { spending } = useCategorySpending(startOfMonth, endOfMonth)
-
-  useEffect(() => {
-    generatePendingTransactions()
-  }, [])
 
   const totalBalance = balances.reduce((sum, b) => sum + b.current_balance, 0)
   const totalSpending = spending.reduce((sum, s) => sum + s.personal_total, 0)
@@ -116,7 +109,7 @@ export function DashboardPage() {
                 return (
                   <div key={s.category_id} className="flex items-center gap-3">
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                       style={{ backgroundColor: s.color + '20' }}
                     >
                       <Icon className="w-4 h-4" style={{ color: s.color }} />
@@ -199,7 +192,7 @@ export function DashboardPage() {
                   <Card className="hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center gap-3 py-3 px-4">
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: (cat?.color || '#6b7280') + '20' }}
                       >
                         <Icon className="w-4 h-4" style={{ color: cat?.color || '#6b7280' }} />
