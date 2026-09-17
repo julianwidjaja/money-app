@@ -15,6 +15,7 @@ export interface Account {
   credit_limit: number | null
   statement_day: number | null
   default_funding_account_id: string | null
+  payment_account_id: string | null
   is_archived: boolean
   sort_order: number
   created_at: string

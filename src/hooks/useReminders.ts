@@ -102,11 +102,12 @@ export function useReminders() {
 
     const { data: ccAccount } = await supabase
       .from('accounts')
-      .select('default_funding_account_id, statement_day')
+      .select('default_funding_account_id, payment_account_id, statement_day')
       .eq('id', reminder.account_id)
       .single()
 
     const defaultFundingId = ccAccount?.default_funding_account_id || null
+    const paymentAccountId = ccAccount?.payment_account_id || null
     let defaultFundingName: string | null = null
     if (defaultFundingId) {
       const { data: dfAccount } = await supabase
@@ -159,6 +160,47 @@ export function useReminders() {
         }
       } else {
         unfundedTotal += entry.amount
+      }
+    }
+
+    // A payment account carries money set aside from the previous month. Use
+    // that balance first, and only ask the default funding account for the
+    // remainder. This keeps the reminder total equal to the statement total.
+    if (paymentAccountId && isAutoCC && !reminder.title.includes('to 9%') && !reminder.title.includes('to 5%')) {
+      const { data: paymentBalance } = await supabase
+        .from('account_balances')
+        .select('current_balance')
+        .eq('account_id', paymentAccountId)
+        .maybeSingle()
+      const statementTotal = Array.from(fundedMap.values()).reduce((sum, f) => sum + f.total, 0) + unfundedTotal
+      const carryover = Math.min(Math.max(paymentBalance?.current_balance || 0, 0), statementTotal)
+
+      if (carryover > 0) {
+        let remaining = carryover
+        const preferred = defaultFundingId ? [defaultFundingId, ...Array.from(fundedMap.keys()).filter(id => id !== defaultFundingId)] : Array.from(fundedMap.keys())
+        for (const id of preferred) {
+          const funding = fundedMap.get(id)
+          if (!funding || remaining <= 0) continue
+          const applied = Math.min(funding.total, remaining)
+          funding.total -= applied
+          remaining -= applied
+          if (funding.total === 0) fundedMap.delete(id)
+        }
+        if (remaining > 0) {
+          const applied = Math.min(unfundedTotal, remaining)
+          unfundedTotal -= applied
+        }
+
+        const { data: paymentAccount } = await supabase
+          .from('accounts')
+          .select('name')
+          .eq('id', paymentAccountId)
+          .single()
+        fundedMap.set(paymentAccountId, {
+          funding_account_id: paymentAccountId,
+          account_name: paymentAccount?.name || 'Credit Card Payment',
+          total: carryover,
+        })
       }
     }
 
