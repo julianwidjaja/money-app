@@ -95,6 +95,7 @@ export function AccountsPage() {
   const [creditLimit, setCreditLimit] = useState(0)
   const [statementDay, setStatementDay] = useState('')
   const [defaultFundingId, setDefaultFundingId] = useState('')
+  const [paymentAccountId, setPaymentAccountId] = useState('')
   const [saving, setSaving] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -104,6 +105,7 @@ export function AccountsPage() {
   const [editCreditLimit, setEditCreditLimit] = useState(0)
   const [editStatementDay, setEditStatementDay] = useState('')
   const [editDefaultFundingId, setEditDefaultFundingId] = useState('')
+  const [editPaymentAccountId, setEditPaymentAccountId] = useState('')
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -168,6 +170,7 @@ export function AccountsPage() {
       credit_limit: type === 'credit_card' && creditLimit > 0 ? creditLimit : null,
       statement_day: type === 'credit_card' && parsedStmtDay && parsedStmtDay >= 1 && parsedStmtDay <= 31 ? parsedStmtDay : null,
       default_funding_account_id: type === 'credit_card' && defaultFundingId ? defaultFundingId : null,
+      payment_account_id: type === 'credit_card' && paymentAccountId ? paymentAccountId : null,
       icon: null, color: null, is_archived: false, sort_order: accounts.length,
     })
     setSaving(false)
@@ -177,7 +180,7 @@ export function AccountsPage() {
         await createCCReminders(result.data as Account)
       }
       toast.success('Account created')
-      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setCreditLimit(0); setStatementDay(''); setDefaultFundingId(''); refetch()
+      setCreateOpen(false); setName(''); setType(''); setInitialBalance(0); setCreditLimit(0); setStatementDay(''); setDefaultFundingId(''); setPaymentAccountId(''); refetch()
     }
   }
 
@@ -188,6 +191,7 @@ export function AccountsPage() {
     setEditCreditLimit(account.credit_limit ?? 0)
     setEditStatementDay(account.statement_day != null ? String(account.statement_day) : '')
     setEditDefaultFundingId(account.default_funding_account_id || '')
+    setEditPaymentAccountId(account.payment_account_id || '')
     setEditOpen(true)
   }
 
@@ -205,6 +209,7 @@ export function AccountsPage() {
       credit_limit: ccLimit,
       statement_day: stmtDay,
       default_funding_account_id: editType === 'credit_card' && editDefaultFundingId ? editDefaultFundingId : null,
+      payment_account_id: editType === 'credit_card' && editPaymentAccountId ? editPaymentAccountId : null,
     })
     setSaving(false)
     if (result?.error) { toast.error('Failed to update account') }
@@ -301,6 +306,17 @@ export function AccountsPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Credit Card Payment Account</Label>
+                        <Select value={paymentAccountId || 'none'} onValueChange={(v) => v != null && setPaymentAccountId(v === 'none' ? '' : v)} items={[{ value: 'none', label: 'None' }, ...accounts.filter(a => a.type !== 'credit_card').map(a => ({ value: a.id, label: a.name }))]}>
+                          <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {accounts.filter(a => a.type !== 'credit_card').map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Use this account's balance first when calculating the monthly payment.</p>
                       </div>
                     </>
                   )}
@@ -500,6 +516,17 @@ export function AccountsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Credit Card Payment Account</Label>
+                  <Select value={editPaymentAccountId || 'none'} onValueChange={(v) => v != null && setEditPaymentAccountId(v === 'none' ? '' : v)} items={[{ value: 'none', label: 'None' }, ...accounts.filter(a => a.type !== 'credit_card' && a.id !== editId).map(a => ({ value: a.id, label: a.name }))]}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {accounts.filter(a => a.type !== 'credit_card' && a.id !== editId).map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Use this account's balance first when calculating the monthly payment.</p>
                 </div>
               </>
             )}

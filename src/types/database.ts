@@ -38,6 +38,10 @@ export interface Database {
           sort_order: number
           created_at: string
           updated_at: string
+          credit_limit: number | null
+          statement_day: number | null
+          default_funding_account_id: string | null
+          payment_account_id: string | null
         }
         Insert: {
           id?: string
@@ -51,6 +55,10 @@ export interface Database {
           sort_order?: number
           created_at?: string
           updated_at?: string
+          credit_limit?: number | null
+          statement_day?: number | null
+          default_funding_account_id?: string | null
+          payment_account_id?: string | null
         }
         Update: {
           name?: string
@@ -61,6 +69,10 @@ export interface Database {
           is_archived?: boolean
           sort_order?: number
           updated_at?: string
+          credit_limit?: number | null
+          statement_day?: number | null
+          default_funding_account_id?: string | null
+          payment_account_id?: string | null
         }
       }
       categories: {
