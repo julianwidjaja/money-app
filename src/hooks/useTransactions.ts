@@ -300,7 +300,7 @@ export function useTransactions(options?: FetchOptions) {
 
     const { error: groupError } = await supabase
       .from('transaction_groups')
-      .update({ description: input.description, date: input.date, updated_at: new Date().toISOString() })
+      .update({ type: 'split', description: input.description, date: input.date, updated_at: new Date().toISOString() })
       .eq('id', groupId)
 
     if (groupError) return { error: groupError }

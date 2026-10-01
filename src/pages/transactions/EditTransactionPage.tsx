@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
+import { SplitTransactionForm } from '@/components/transactions/SplitTransactionForm'
 import { TransferForm } from '@/components/transactions/TransferForm'
 import { ArrowLeft } from 'lucide-react'
 import type { TransactionWithEntries } from '@/types'
 import type { SimpleEditData } from '@/components/transactions/TransactionForm'
 import type { TransferEditData } from '@/components/transactions/TransferForm'
+import type { SplitEditData } from '@/components/transactions/SplitTransactionForm'
 
 export function EditTransactionPage() {
   const { id } = useParams()
@@ -54,7 +56,9 @@ export function EditTransactionPage() {
     navigate(`/transactions/${id}`, { replace: true })
   }
 
-  if (tx.type === 'simple') {
+  const hasReimbursements = tx.entries.some(e => e.type === 'reimbursement')
+
+  if (tx.type === 'simple' && !hasReimbursements) {
     const mainEntry = tx.entries.find(e => e.type === 'expense' || e.type === 'income')
     if (!mainEntry) return <div className="py-12 text-center text-muted-foreground">Invalid transaction</div>
 
@@ -115,21 +119,18 @@ export function EditTransactionPage() {
     )
   }
 
-  if (tx.type === 'split') {
+  if (tx.type === 'split' || hasReimbursements) {
     const expenseEntry = tx.entries.find(e => e.type === 'expense')
     const reimbursementEntries = tx.entries.filter(e => e.type === 'reimbursement')
     if (!expenseEntry) return <div className="py-12 text-center text-muted-foreground">Invalid split transaction</div>
 
-    const editData: SimpleEditData = {
+    const editData: SplitEditData = {
       groupId: tx.id,
-      amount: expenseEntry.amount,
+      totalAmount: expenseEntry.amount,
       accountId: expenseEntry.account_id,
       categoryId: expenseEntry.category_id || '',
       date: tx.date,
-      name: tx.description || '',
-      description: expenseEntry.note || '',
-      fundingAccountId: expenseEntry.funding_account_id || undefined,
-      isSplit: true,
+      description: tx.description || '',
       reimbursements: reimbursementEntries.map(r => ({
         id: r.id,
         friendName: (r.note || '').replace('Reimbursement from ', ''),
@@ -143,7 +144,7 @@ export function EditTransactionPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
-        <TransactionForm type="expense" onSuccess={handleSuccess} editData={editData} />
+        <SplitTransactionForm onSuccess={handleSuccess} editData={editData} />
       </div>
     )
   }
