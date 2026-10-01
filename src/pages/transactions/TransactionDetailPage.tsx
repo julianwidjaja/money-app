@@ -69,7 +69,7 @@ export function TransactionDetailPage() {
 
   const mainEntry = tx.entries.find(e => e.type === 'expense' || e.type === 'income') || tx.entries[0]
   const reimbursements = tx.entries.filter(e => e.type === 'reimbursement')
-  const isSplit = tx.type === 'split'
+  const isSplit = tx.type === 'split' || reimbursements.length > 0
 
   return (
     <div className="space-y-4 py-4">
