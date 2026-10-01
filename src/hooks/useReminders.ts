@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { addWeeks, addMonths, addYears, format, startOfDay } from 'date-fns'
+import { addWeeks, addMonths, addYears, endOfMonth, format, startOfDay } from 'date-fns'
 
 export interface Reminder {
   id: string
@@ -44,17 +44,59 @@ export function useReminders() {
 
   const fetchReminders = useCallback(async () => {
     if (!user) return
-    const { data, error } = await supabase
+    const [{ data, error }, { data: ccAccounts }] = await Promise.all([
+      supabase
       .from('reminders')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .order('next_due')
-    if (!error && data) setReminders(data as Reminder[])
+      .order('next_due'),
+      supabase
+        .from('accounts')
+        .select('id, name, user_id, payment_account_id, default_funding_account_id')
+        .eq('user_id', user.id)
+        .eq('type', 'credit_card')
+        .not('payment_account_id', 'is', null)
+        .not('default_funding_account_id', 'is', null),
+    ])
+
+    if (error) {
+      setLoading(false)
+      return
+    }
+
+    let activeReminders = (data || []) as Reminder[]
+    const configuredCCs = (ccAccounts || []) as { id: string; name: string; user_id: string }[]
+    if (configuredCCs) {
+      const missing = configuredCCs.filter((account) =>
+        !activeReminders.some(reminder => reminder.account_id === account.id && reminder.is_auto && reminder.title.startsWith('Transfer ')),
+      )
+      if (missing.length > 0) {
+        const { data: inserted } = await supabase
+          .from('reminders')
+          .insert(missing.map(account => ({
+            user_id: account.user_id,
+            title: `Transfer ${account.name} funding to payment account`,
+            account_id: account.id,
+            frequency: 'monthly',
+            due_day: 31,
+            next_due: computeFirstDueForDay(31),
+            is_auto: true,
+          })))
+          .select()
+        if (inserted) activeReminders = [...activeReminders, ...(inserted as Reminder[])]
+      }
+    }
+    setReminders(activeReminders.sort((a, b) => a.next_due.localeCompare(b.next_due)))
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetchReminders() }, [fetchReminders])
+  useEffect(() => {
+    const loadReminders = async () => {
+      await fetchReminders()
+    }
+    void loadReminders()
+  }, [fetchReminders])
 
   const today = format(startOfDay(new Date()), 'yyyy-MM-dd')
   const dueReminders = reminders.filter(r => r.next_due <= today)
@@ -76,7 +118,7 @@ export function useReminders() {
     if (!reminder) return
 
     const now = new Date().toISOString()
-    const nextDue = computeNextDue(reminder.next_due, reminder.frequency)
+    const nextDue = computeNextDue(reminder.next_due, reminder.frequency, reminder.due_day)
 
     await supabase.from('reminder_history').insert({
       reminder_id: id,
@@ -124,8 +166,15 @@ export function useReminders() {
       .eq('account_id', reminder.account_id)
       .eq('type', 'expense')
 
-    const isAutoCC = reminder.is_auto && ccAccount?.statement_day
-    if (isAutoCC) {
+    const isMonthEndFundingReminder = reminder.is_auto && reminder.title.startsWith('Transfer ')
+    const isAutoCC = reminder.is_auto && ccAccount?.statement_day && !isMonthEndFundingReminder
+    if (isMonthEndFundingReminder) {
+      // This reminder is specifically for money that the default funding
+      // account needs to reserve in the linked payment account. An explicit
+      // funding account is external funding and must not be included.
+      const monthStart = `${reminder.next_due.slice(0, 8)}01`
+      query = query.gte('group.date', monthStart).lte('group.date', reminder.next_due)
+    } else if (isAutoCC) {
       const previousStatementDate = getStatementDateForReminder(reminder.next_due, ccAccount.statement_day)
       query = query
         .gte('group.date', previousStatementDate)
@@ -137,6 +186,16 @@ export function useReminders() {
     const { data } = await query as { data: { amount: number; funding_account_id: string | null; account: { name: string } | null; group: { date: string } }[] | null }
 
     if (!data) return { funded: [], unfundedTotal: 0 }
+
+    if (isMonthEndFundingReminder) {
+      if (!defaultFundingId || !defaultFundingName) return { funded: [], unfundedTotal: 0 }
+      const total = data
+        .filter(entry => !entry.funding_account_id || entry.funding_account_id === defaultFundingId)
+        .reduce((sum, entry) => sum + entry.amount, 0)
+      return total > 0
+        ? { funded: [{ funding_account_id: defaultFundingId, account_name: defaultFundingName, total }], unfundedTotal: 0 }
+        : { funded: [], unfundedTotal: 0 }
+    }
 
     const fundedMap = new Map<string, FundingBreakdown>()
     let unfundedTotal = 0
@@ -299,39 +358,64 @@ function computeFirstDueForDay(dueDay: number): string {
   const year = today.getFullYear()
   const month = today.getMonth()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const day = Math.min(dueDay, daysInMonth)
+  const day = dueDay === 31 ? daysInMonth : Math.min(dueDay, daysInMonth)
   const thisMonth = new Date(year, month, day)
   const thisMonthStr = format(thisMonth, 'yyyy-MM-dd')
   if (thisMonthStr >= todayStr) return thisMonthStr
-  return format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
+  return dueDay === 31
+    ? format(endOfMonth(addMonths(thisMonth, 1)), 'yyyy-MM-dd')
+    : format(addMonths(thisMonth, 1), 'yyyy-MM-dd')
 }
 
-export async function createCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null }) {
-  if (!account.statement_day || !account.credit_limit) return
+export async function createCCReminders(account: { id: string; user_id: string; name: string; statement_day: number | null; credit_limit: number | null; default_funding_account_id?: string | null; payment_account_id?: string | null }) {
+  const reminders: {
+    user_id: string
+    title: string
+    account_id: string
+    frequency: string
+    due_day: number
+    next_due: string
+    is_auto: boolean
+  }[] = []
 
-  const preDay = wrapDay(account.statement_day - 3)
-  const postDay = wrapDay(account.statement_day + 1)
+  if (account.statement_day && account.credit_limit) {
+    const preDay = wrapDay(account.statement_day - 3)
+    const postDay = wrapDay(account.statement_day + 1)
+    reminders.push(
+      {
+        user_id: account.user_id,
+        title: `Pay ${account.name} to 5%`,
+        account_id: account.id,
+        frequency: 'monthly',
+        due_day: preDay,
+        next_due: computeFirstDueForDay(preDay),
+        is_auto: true,
+      },
+      {
+        user_id: account.user_id,
+        title: `Pay remaining ${account.name}`,
+        account_id: account.id,
+        frequency: 'monthly',
+        due_day: postDay,
+        next_due: computeFirstDueForDay(postDay),
+        is_auto: true,
+      },
+    )
+  }
 
-  await supabase.from('reminders').insert([
-    {
+  if (account.default_funding_account_id && account.payment_account_id) {
+    reminders.push({
       user_id: account.user_id,
-      title: `Pay ${account.name} to 5%`,
+      title: `Transfer ${account.name} funding to payment account`,
       account_id: account.id,
       frequency: 'monthly',
-      due_day: preDay,
-      next_due: computeFirstDueForDay(preDay),
+      due_day: 31,
+      next_due: computeFirstDueForDay(31),
       is_auto: true,
-    },
-    {
-      user_id: account.user_id,
-      title: `Pay remaining ${account.name}`,
-      account_id: account.id,
-      frequency: 'monthly',
-      due_day: postDay,
-      next_due: computeFirstDueForDay(postDay),
-      is_auto: true,
-    },
-  ])
+    })
+  }
+
+  await supabase.from('reminders').insert(reminders)
 }
 
 export async function deleteCCReminders(accountId: string) {
@@ -347,13 +431,13 @@ export async function updateCCReminders(account: { id: string; user_id: string; 
   await createCCReminders(account)
 }
 
-function computeNextDue(currentDue: string, frequency: string): string {
+function computeNextDue(currentDue: string, frequency: string, dueDay?: number): string {
   const date = new Date(currentDue + 'T00:00:00')
   let next: Date
   switch (frequency) {
     case 'weekly': next = addWeeks(date, 1); break
     case 'biweekly': next = addWeeks(date, 2); break
-    case 'monthly': next = addMonths(date, 1); break
+    case 'monthly': next = dueDay === 31 ? endOfMonth(addMonths(date, 1)) : addMonths(date, 1); break
     case 'yearly': next = addYears(date, 1); break
     default: next = addMonths(date, 1)
   }
